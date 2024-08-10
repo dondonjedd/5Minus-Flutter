@@ -1,4 +1,4 @@
-package com.example.five_minus
+package com.five_minus.app
 
 import io.flutter.embedding.android.FlutterActivity
 

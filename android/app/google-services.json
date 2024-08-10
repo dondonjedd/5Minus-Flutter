@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "74700725365",
+    "project_id": "minus-9c259",
+    "storage_bucket": "minus-9c259.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74700725365:android:de26eb7de002caff062c3c",
+        "android_client_info": {
+          "package_name": "com.five_minus.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAciYnoOoejpisAqzQE0aqLFerUxMTrqPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
