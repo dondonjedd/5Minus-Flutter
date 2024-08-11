@@ -1,9 +1,12 @@
 import 'dart:developer';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import '../utility/dialog_utility.dart';
 
 class AuthenticationService {
   static Future<bool> signInGoogle() async {
@@ -30,37 +33,46 @@ class AuthenticationService {
     }
   }
 
-  static Future<bool> signInEmailPassword({required String emailAddress, required String password}) async {
+  static Future<void> signInEmailPassword(BuildContext context, {required String emailAddress, required String password}) async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(email: emailAddress, password: password);
-      return true;
     } on FirebaseAuthException catch (e) {
+      bool res = false;
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
         if (e.code == 'user-not-found') log('No user found for that email. Continue with registration');
         if (e.code == 'invalid-credential') log('Invalid Credential');
 
-        registerEmailPassword(emailAddress: emailAddress, password: password);
-      } else if (e.code == 'wrong-password') {
-        log('Wrong password provided for that user.');
+        if (context.mounted) {
+          res = await registerEmailPassword(context, emailAddress: emailAddress, password: password);
+        }
       }
-      return false;
+      if (!res) {
+        if (context.mounted) DialogUtility().showError(context, title: 'Login error', message: 'Invalid Credential');
+      }
+    } catch (e) {
+      if (context.mounted) DialogUtility().showError(context, title: 'Login error', message: 'Invalid Credential');
     }
   }
 
-  static void registerEmailPassword({required String emailAddress, required String password}) async {
+  static Future<bool> registerEmailPassword(BuildContext context, {required String emailAddress, required String password}) async {
     try {
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailAddress,
         password: password,
       );
+      return true;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'weak-password') {
         log('The password provided is too weak.');
-      } else if (e.code == 'email-already-in-use') {
-        log('The account already exists for that email.');
+        if (context.mounted) DialogUtility().showError(context, title: 'Login error', message: 'The password provided is too weak.');
+      } else if (context.mounted) {
+        DialogUtility().showError(context, title: 'Login error', message: 'Invalid Credential');
       }
+      return false;
     } catch (e) {
       log(e.toString());
+      if (context.mounted) DialogUtility().showError(context, title: 'Login error', message: 'Invalid Credential');
+      return false;
     }
   }
 
