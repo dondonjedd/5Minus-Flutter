@@ -9,14 +9,14 @@ class MenuItemView extends StatelessWidget {
   final void Function()? onTap;
 
   const MenuItemView({
-    Key? key,
+    super.key,
     required this.title,
     this.subtitle,
     this.color,
     this.prefix,
     this.suffix,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

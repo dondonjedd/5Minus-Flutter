@@ -22,8 +22,20 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
   }
 
   @override
+  void didChangeDependencies() {
+    // TODO: implement didChangeDependencies
+    super.didChangeDependencies();
+    precacheImage(
+        const AssetImage(
+          'asset/image/background.jpg',
+        ),
+        context);
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
     super.dispose();
   }
 
@@ -33,8 +45,8 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
       debugShowCheckedModeBanner: ConfigurationData.screenshotMode ? false : true,
       title: widget.name,
       themeMode: ConfigurationData.defaultThemeMode,
+
       theme: ThemeData(
-        fontFamily: 'SfProDisplay',
         useMaterial3: true,
         brightness: Brightness.light,
         primaryColor: ColorVariableData.light.primary,
@@ -79,6 +91,9 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
           labelSmall: TextStyle(
             fontSize: 10,
           ),
+        ).apply(
+          bodyColor: Colors.white,
+          displayColor: Colors.white,
         ),
         colorScheme: ColorScheme.light(
           brightness: Brightness.light,

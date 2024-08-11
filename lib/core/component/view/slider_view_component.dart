@@ -14,7 +14,7 @@ class SliderViewComponent extends StatefulWidget {
   final bool enableNavigatorSpacing;
 
   const SliderViewComponent({
-    Key? key,
+    super.key,
     this.children = const [],
     this.indicatorColor,
     this.enableAutoplay = false,
@@ -23,11 +23,10 @@ class SliderViewComponent extends StatefulWidget {
     this.enableEndlessScroll = false,
     this.enableNavigatorSpacing = false,
   }) :  itemCount = null,
-        itemBuilder = null,
-        super(key: key);
+        itemBuilder = null;
 
   const SliderViewComponent.builder({
-    Key? key,
+    super.key,
     this.itemCount,
     this.itemBuilder,
     this.indicatorColor,
@@ -36,8 +35,7 @@ class SliderViewComponent extends StatefulWidget {
     this.enableWindowMode = false,
     this.enableEndlessScroll = false,
     this.enableNavigatorSpacing = false,
-  }) :  children = const [],
-        super(key: key);
+  }) :  children = const [];
 
   @override
   State<SliderViewComponent> createState() => _SliderViewComponentState();

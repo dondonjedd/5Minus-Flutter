@@ -28,7 +28,7 @@ class DialogTemplateView extends StatelessWidget {
   final Widget? positiveWidget;
 
   const DialogTemplateView({
-    Key? key,
+    super.key,
     this.title,
     this.titleColor,
     this.message,
@@ -50,7 +50,7 @@ class DialogTemplateView extends StatelessWidget {
     this.enableNegativeDismissal = true,
     this.onTapActionPositive,
     this.onTapActionNegative,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

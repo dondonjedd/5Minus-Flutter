@@ -1,4 +1,10 @@
+import 'dart:developer';
+import 'dart:io';
+
+import 'package:five_minus/features/bg_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../data/configuration_data.dart';
 import '../button/icon_button_component.dart';
 
@@ -45,67 +51,49 @@ class ScreenTemplateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final component = WillPopScope(
-      onWillPop: () {
-        if (onBackOverride != null) {
-          onBackOverride?.call();
-          return Future.value(false);
-        }
-        if (ModalRoute.of(context)?.isFirst ?? false) {
-          return onExit(context);
-        }
-        return Future.value(true);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: _infoComponent(
-            iconPrefix: infoIconPrefix,
-            iconSuffix: infoIconSuffix,
-            title: infoTitle,
+    final component = Container(
+      decoration: BoxDecoration(image: DecorationImage(image: Image.memory(BgImage().bgImage!).image, fit: BoxFit.cover)),
+      child: PopScope(
+        onPopInvokedWithResult: (_, __) {
+          if (onBackOverride != null) {
+            onBackOverride?.call();
+          }
+        },
+        canPop: onBackOverride == null,
+        child: Scaffold(
+          appBar: AppBar(
+            title: _infoComponent(
+              iconPrefix: infoIconPrefix,
+              iconSuffix: infoIconSuffix,
+              title: infoTitle,
+              foregroundColor: foregroundColor,
+            ),
+            titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+            actions: suffixActionList,
             foregroundColor: foregroundColor,
+            bottom: tabBar,
+            shadowColor: enableOverlapHeader ? Colors.transparent : null,
+            surfaceTintColor: enableOverlapHeader ? Colors.transparent : null,
+            backgroundColor: enableOverlapHeader ? Colors.transparent : backgroundColor,
+            elevation: enableOverlapHeader ? 0 : null,
+            leading: prefixAction ??
+                (onBackOverride == null
+                    ? null
+                    : IconButtonComponent(
+                        hint: 'Back',
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: onBackOverride ?? () {},
+                      )),
+            centerTitle: true,
           ),
-          titleTextStyle: Theme.of(context).textTheme.headlineMedium,
-          actions: suffixActionList,
-          foregroundColor: foregroundColor,
-          bottom: tabBar,
-          shadowColor: enableOverlapHeader ? Colors.transparent : null,
-          surfaceTintColor: enableOverlapHeader ? Colors.transparent : null,
-          backgroundColor: enableOverlapHeader ? Colors.transparent : backgroundColor,
-          elevation: enableOverlapHeader ? 0 : null,
-          leading: prefixAction ??
-              (onBackOverride == null
-                  ? null
-                  : IconButtonComponent(
-                      hint: 'Back',
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: onBackOverride ?? () {},
-                    )),
-          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          extendBodyBehindAppBar: enableOverlapHeader,
+          body: layout,
+          floatingActionButton: layoutAction,
+          drawer: navigatorLeft,
+          endDrawer: navigatorRight,
+          bottomNavigationBar: navigatorBottom,
         ),
-        backgroundColor: backgroundColor,
-        extendBodyBehindAppBar: enableOverlapHeader,
-        body: GestureDetector(
-          onTap: () {
-            FocusScope.of(context).unfocus();
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Divider(
-                color: Color(0xFFF6F6F6),
-                thickness: 1,
-                height: 1,
-                indent: 48,
-                endIndent: 48,
-              ),
-              Expanded(child: layout ?? const SizedBox.shrink()),
-            ],
-          ),
-        ),
-        floatingActionButton: layoutAction,
-        drawer: navigatorLeft,
-        endDrawer: navigatorRight,
-        bottomNavigationBar: navigatorBottom,
       ),
     );
 
@@ -119,35 +107,6 @@ class ScreenTemplateView extends StatelessWidget {
       return component;
     }
   }
-}
-
-DateTime? currentBackPressTime;
-Future<bool> onExit(BuildContext context) {
-  DateTime now = DateTime.now();
-
-  if (currentBackPressTime == null) {
-    currentBackPressTime = now;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Press back again to exit'),
-      duration: Duration(seconds: 2),
-    ));
-
-    return Future.value(false);
-  }
-
-  if (now.difference(currentBackPressTime!) > const Duration(seconds: 2)) {
-    currentBackPressTime = now;
-
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Press back again to exit'),
-      duration: Duration(seconds: 2),
-    ));
-
-    return Future.value(false);
-  }
-
-  return Future.value(true);
 }
 
 class CollapsibleScreenTemplate extends StatelessWidget {
@@ -380,4 +339,14 @@ Widget? _infoComponent({
   } else {
     return titleWidgetList.first;
   }
+}
+
+Future<File> getImageFileFromAssets(String path) async {
+  final byteData = await rootBundle.load('assets/$path');
+
+  final file = File('${(await getTemporaryDirectory()).path}/$path');
+  await file.create(recursive: true);
+  await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+
+  return file;
 }
