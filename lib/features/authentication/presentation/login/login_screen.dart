@@ -73,7 +73,7 @@ class LoginScreen extends StatelessWidget {
                   horizontal: 32,
                 ),
                 minimumWidth: 300,
-                title: 'Login/Register',
+                title: 'Login',
                 foregroundColor: Colors.black,
                 backgroundColor: Colors.white,
                 style: TextButtonStyle.elevated,
