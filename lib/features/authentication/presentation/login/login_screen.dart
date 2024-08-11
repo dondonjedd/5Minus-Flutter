@@ -25,6 +25,7 @@ class LoginScreen extends StatelessWidget {
               SizedBox(
                 height: MediaQuery.sizeOf(context).height * 0.25,
               ),
+              //email
               Container(
                 width: 500,
                 padding: const EdgeInsets.symmetric(
@@ -46,6 +47,7 @@ class LoginScreen extends StatelessWidget {
                   style: TextInputStyle.fill,
                 ),
               ),
+              //password
               Container(
                 width: 500,
                 padding: const EdgeInsets.symmetric(
@@ -67,7 +69,7 @@ class LoginScreen extends StatelessWidget {
                     label: 'Password'),
               ),
 
-              //sign in/up
+              //sign in
               TextButtonComponent(
                 margin: const EdgeInsets.symmetric(
                   horizontal: 32,
@@ -81,7 +83,21 @@ class LoginScreen extends StatelessWidget {
                   controller.signInEmailPassword(context, emailAddress: emailInputController.text, password: passwordInputController.text);
                 },
               ),
-              //sign in/sign up with google
+              //sign up
+              TextButtonComponent(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                ),
+                minimumWidth: 300,
+                title: 'Register',
+                foregroundColor: Colors.black,
+                backgroundColor: Colors.white,
+                style: TextButtonStyle.elevated,
+                onPressed: () {
+                  controller.registerEmailPassword(context, emailAddress: emailInputController.text, password: passwordInputController.text);
+                },
+              ),
+              //sign in or sign up with google
               TextButtonComponent(
                 margin: const EdgeInsets.symmetric(
                   horizontal: 32,
@@ -104,7 +120,6 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(
                 height: 200,
               ),
-              //password
             ],
           ),
         ),
