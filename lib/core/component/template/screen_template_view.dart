@@ -1,10 +1,9 @@
-import 'dart:developer';
 import 'dart:io';
 
-import 'package:five_minus/features/bg_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../features/bg_image.dart';
 import '../../data/configuration_data.dart';
 import '../button/icon_button_component.dart';
 
@@ -52,7 +51,24 @@ class ScreenTemplateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final component = Container(
-      decoration: BoxDecoration(image: DecorationImage(image: Image.memory(BgImage().bgImage!).image, fit: BoxFit.cover)),
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: BgImage().bgImage!,
+          fit: BoxFit.cover,
+        ),
+        gradient: const RadialGradient(
+          colors: [
+            Color(0XFF108568),
+            Color(0XFF038061),
+            Color(0XFF01795a),
+            Color(0XFF017252),
+            Color(0XFF006b4b),
+            Color(0XFF016444),
+            Color(0XFF015a3d),
+          ],
+          radius: 0.8,
+        ),
+      ),
       child: PopScope(
         onPopInvokedWithResult: (_, __) {
           if (onBackOverride != null) {
