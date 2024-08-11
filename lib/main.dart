@@ -4,9 +4,7 @@ import 'package:five_minus/core/component/template/app_template_view.dart';
 import 'package:five_minus/features/bg_image.dart';
 import 'package:five_minus/go_router.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'core/utility/app_utility.dart';
 
