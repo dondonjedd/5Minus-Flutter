@@ -60,6 +60,7 @@ dependencies:
   http_parser: any
   flutter_bloc: ^8.1.6
   path_provider: ^2.1.4
+  firebase_auth: ^4.16.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

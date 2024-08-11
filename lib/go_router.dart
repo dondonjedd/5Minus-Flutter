@@ -1,5 +1,6 @@
-import 'package:five_minus/core/component/template/screen_template_view.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/authentication/presentation/login/login_controller.dart';
+import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,7 +15,7 @@ class RouterInstance {
 
   factory RouterInstance() => _instance ?? RouterInstance._internal();
 
-  intialise() {
+  GoRouter? intialise() {
     goRoute = GoRouter(
       debugLogDiagnostics: true,
       initialLocation: '/',
@@ -26,34 +27,12 @@ class RouterInstance {
             return defaultBuilder(context);
           },
           redirect: (context, state) async {
+            final user = FirebaseAuth.instance.currentUser;
+
+            if (user == null) {
+              return '/loginController';
+            }
             return null;
-
-            // final status = context.read<AuthCubit>().state;
-
-            // if (status.token?.isNotEmpty ?? false) {
-            //   if (status.resetFlag == 'C') {
-            //     return '/changePassword';
-            //   }
-            //   switch (status.runtimeType) {
-            //     case Distribution:
-            //       if ((status as Distribution).confirmParking?.process == ScanType.getTypeString(scanType: ScanType.yardIn) ||
-            //           (status).confirmParking?.process == ScanType.getTypeString(scanType: ScanType.stagingIn)) {
-            //         if (status.confirmParking?.confirmFlag == 'Y' && status.confirmParking?.parkingFlag == 'N') {
-            //           return '/processSummary';
-            //         }
-            //       }
-
-            //       return '/distributionDashboard?isAfterUpdate=${state.uri.queryParameters['isAfterUpdate']}';
-            //     case Transporter || TransporterAdmin:
-            //       return '/transporterDashboard';
-            //     case Outlet:
-            //       return '/outletDashboard';
-            //     default:
-            //       return '/login';
-            //   }
-            // } else {
-            //   return '/login';
-            // }
           },
         ),
         GoRoute(
@@ -63,53 +42,38 @@ class RouterInstance {
             return LoginController.screen();
           },
           redirect: (context, state) async {
-            return null;
+            final user = FirebaseAuth.instance.currentUser;
 
-            // final status = context.read<AuthCubit>().state;
-            // if (status.token?.isEmpty ?? true) {
-            //   return null;
-            // }
-            // return '/';
+            if (user == null) {
+              return null;
+            }
+            return '/';
           },
-          // routes: [
-          //   GoRoute(
-          //     path: 'forgotPassword',
-          //     name: ForgotPasswordController.routeName,
-          //     builder: (context, state) {
-          //       return ForgotPasswordController.screen();
-          //     },
-          //   ),
-          // ]
+        ),
+        GoRoute(
+          path: '/dashboardController',
+          name: DashboardController.routeName,
+          builder: (context, state) {
+            return DashboardController.screen();
+          },
+          redirect: (context, state) async {
+            final user = FirebaseAuth.instance.currentUser;
+
+            if (user != null) {
+              return null;
+            }
+            return '/';
+          },
         ),
       ],
     );
+
+    return goRoute;
   }
 
   Widget defaultBuilder(BuildContext context) {
-    return LoginController.screen();
-    return const ScreenTemplateView(
-      layout: Center(
-        child: Text('ERROR'),
-      ),
-    );
-    // final status = context.read<AuthCubit>().state;
-
-    // if (status.token?.isNotEmpty ?? false) {
-    //   if (status.resetFlag == 'C') {
-    //     return ChangePasswordController.screen();
-    //   }
-    //   switch (status.runtimeType) {
-    //     case Distribution:
-    //       return DistributionDashboardController.screen();
-    //     case Transporter || TransporterAdmin:
-    //       return TransporterDashboardController.screen();
-    //     case Outlet:
-    //       return OutletDashboardController.screen();
-    //     default:
-    //       return AuthenticationLoginControllerRoute.screen();
-    //   }
-    // } else {
-    //   return AuthenticationLoginControllerRoute.screen();
-    // }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return LoginController.screen();
+    return DashboardController.screen();
   }
 }

@@ -262,9 +262,12 @@ class TextInputComponent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inputComponent = TextFormField(
+      onTapOutside: (event) {
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
       autofocus: autofocus,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      style: const TextStyle(fontSize: 14),
+      style: const TextStyle(fontSize: 14, color: Colors.black),
       controller: controller,
       readOnly: enableViewOnly,
       obscureText: enableObscurity,
@@ -702,7 +705,7 @@ Widget dateTimeInput({
   final double? radius,
 }) {
   final component = TextFormField(
-    style: const TextStyle(fontSize: 14),
+    style: const TextStyle(fontSize: 14, color: Colors.black),
     key: key,
     controller: dateInputController,
     validator: onValidate,
@@ -716,6 +719,7 @@ Widget dateTimeInput({
       hint: hint,
       backgroundColor: backgroundColor,
       radius: radius,
+
       // borderColor: borderColor,
       style: style,
       prefixIcon: null,

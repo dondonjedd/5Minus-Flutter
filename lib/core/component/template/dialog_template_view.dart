@@ -58,7 +58,7 @@ class DialogTemplateView extends StatelessWidget {
       title: Text(
         title ?? 'Alert',
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleMedium,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.black),
       ),
       content: _contentLayout(),
       contentPadding: const EdgeInsets.symmetric(
@@ -86,7 +86,7 @@ class DialogTemplateView extends StatelessWidget {
           message ?? '',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: messageColor,
+            color: messageColor ?? Colors.black,
           ),
         ),
       ));

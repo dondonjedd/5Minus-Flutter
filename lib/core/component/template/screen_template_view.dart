@@ -42,7 +42,7 @@ class ScreenTemplateView extends StatelessWidget {
       this.navigatorBottom,
       this.foregroundColor,
       this.backgroundColor,
-      this.enableOverlapHeader = false,
+      this.enableOverlapHeader = true,
       this.onBackOverride,
       this.onTapEnvironment,
       this.prefixAction});
@@ -76,31 +76,33 @@ class ScreenTemplateView extends StatelessWidget {
         },
         canPop: onBackOverride == null,
         child: Scaffold(
-          appBar: AppBar(
-            title: _infoComponent(
-              iconPrefix: infoIconPrefix,
-              iconSuffix: infoIconSuffix,
-              title: infoTitle,
-              foregroundColor: foregroundColor,
-            ),
-            titleTextStyle: Theme.of(context).textTheme.headlineMedium,
-            actions: suffixActionList,
-            foregroundColor: foregroundColor,
-            bottom: tabBar,
-            shadowColor: enableOverlapHeader ? Colors.transparent : null,
-            surfaceTintColor: enableOverlapHeader ? Colors.transparent : null,
-            backgroundColor: enableOverlapHeader ? Colors.transparent : backgroundColor,
-            elevation: enableOverlapHeader ? 0 : null,
-            leading: prefixAction ??
-                (onBackOverride == null
-                    ? null
-                    : IconButtonComponent(
-                        hint: 'Back',
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: onBackOverride ?? () {},
-                      )),
-            centerTitle: true,
-          ),
+          appBar: (infoTitle?.isEmpty ?? true)
+              ? null
+              : AppBar(
+                  title: _infoComponent(
+                    iconPrefix: infoIconPrefix,
+                    iconSuffix: infoIconSuffix,
+                    title: infoTitle,
+                    foregroundColor: foregroundColor,
+                  ),
+                  titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+                  actions: suffixActionList,
+                  foregroundColor: foregroundColor,
+                  bottom: tabBar,
+                  shadowColor: enableOverlapHeader ? Colors.transparent : null,
+                  surfaceTintColor: enableOverlapHeader ? Colors.transparent : null,
+                  backgroundColor: enableOverlapHeader ? Colors.transparent : backgroundColor,
+                  elevation: enableOverlapHeader ? 0 : null,
+                  leading: prefixAction ??
+                      (onBackOverride == null
+                          ? null
+                          : IconButtonComponent(
+                              hint: 'Back',
+                              icon: const Icon(Icons.arrow_back),
+                              onPressed: onBackOverride ?? () {},
+                            )),
+                  centerTitle: true,
+                ),
           backgroundColor: Colors.transparent,
           extendBodyBehindAppBar: enableOverlapHeader,
           body: layout,
