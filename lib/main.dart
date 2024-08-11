@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:five_minus/core/component/template/app_template_view.dart';
-import 'package:five_minus/features/bg_image.dart';
 import 'package:five_minus/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -34,8 +31,6 @@ void main() async {
   // await environmentCubit.initialise();
   // LanguageCubit languageCubit = LanguageCubit();
   // await languageCubit.initialise();
-
-  await BgImage().initialise();
 
   await Future.delayed(const Duration(seconds: 3));
 

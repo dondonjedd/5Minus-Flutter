@@ -23,13 +23,8 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
 
   @override
   void didChangeDependencies() {
-    // TODO: implement didChangeDependencies
+    precacheImage(const AssetImage('asset/image/background.jpg'), context);
     super.didChangeDependencies();
-    precacheImage(
-        const AssetImage(
-          'asset/image/background.jpg',
-        ),
-        context);
   }
 
   @override
@@ -45,7 +40,6 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
       debugShowCheckedModeBanner: ConfigurationData.screenshotMode ? false : true,
       title: widget.name,
       themeMode: ConfigurationData.defaultThemeMode,
-
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import '../../../features/bg_image.dart';
 import '../../data/configuration_data.dart';
 import '../button/icon_button_component.dart';
 
@@ -51,12 +50,12 @@ class ScreenTemplateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final component = Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         image: DecorationImage(
-          image: BgImage().bgImage!,
+          image: AssetImage('asset/image/background.jpg'),
           fit: BoxFit.cover,
         ),
-        gradient: const RadialGradient(
+        gradient: RadialGradient(
           colors: [
             Color(0XFF108568),
             Color(0XFF038061),
