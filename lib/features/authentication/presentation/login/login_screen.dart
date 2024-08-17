@@ -1,8 +1,8 @@
+import 'package:five_minus/core/component/input/password_form_field.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/component/button/text_button_component.dart';
-import '../../../../core/component/input/text_input_component.dart';
 import '../../../../core/component/template/screen_template_view.dart';
 import 'login_controller.dart';
 
@@ -31,44 +31,29 @@ class LoginScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                 ),
-                child: TextInputComponent.email(
+                child: TextFormField(
                   controller: emailInputController,
-                  label: 'Email',
-                  prefixIcon: SizedBox.square(
-                    dimension: 24,
-                    child: Center(
-                      child: Image.asset(
-                        AssetPath.avatar,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.black),
+                  onTapOutside: (event) {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
                   ),
-                  backgroundColor: Theme.of(context).colorScheme.onPrimary,
-                  style: TextInputStyle.fill,
                 ),
-              ),
-              //password
-              Container(
-                width: 500,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                ),
-                child: SecureTextInputComponent(
-                    controller: passwordInputController,
-                    backgroundColor: Theme.of(context).colorScheme.onPrimary,
-                    style: TextInputStyle.fill,
-                    prefixIcon: SizedBox.square(
-                      dimension: 24,
-                      child: Center(
-                        child: Image.asset(
-                          AssetPath.lock,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    label: 'Password'),
               ),
 
+              const Padding(padding: EdgeInsets.only(bottom: 12)),
+              //password
+              Container(
+                  width: 500,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                  ),
+                  child: PasswordFormField(passwordController: passwordInputController)),
+              const Padding(padding: EdgeInsets.only(bottom: 12)),
               //sign in
               TextButtonComponent(
                 margin: const EdgeInsets.symmetric(
@@ -94,7 +79,7 @@ class LoginScreen extends StatelessWidget {
                 backgroundColor: Colors.white,
                 style: TextButtonStyle.elevated,
                 onPressed: () {
-                  controller.registerEmailPassword(context, emailAddress: emailInputController.text, password: passwordInputController.text);
+                  controller.navigateRegister(context);
                 },
               ),
               //sign in or sign up with google

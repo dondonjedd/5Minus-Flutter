@@ -25,6 +25,8 @@ class AuthNetworkDatasource {
         email: emailAddress,
         password: password,
       );
+      FirebaseAuth.instance.currentUser?.sendEmailVerification();
+
       return true;
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Login Error', statusCode: '999', type: '2');

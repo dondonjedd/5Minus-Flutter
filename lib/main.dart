@@ -48,8 +48,6 @@ void main() async {
   // LanguageCubit languageCubit = LanguageCubit();
   // await languageCubit.initialise();
 
-  await Future.delayed(const Duration(seconds: 3));
-
   FlutterNativeSplash.remove();
   runApp(AppTemplateView(
     goRouter: goRoute,

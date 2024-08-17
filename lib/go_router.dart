@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/authentication/presentation/login/login_controller.dart';
+import 'package:five_minus/features/authentication/presentation/register/register_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -36,20 +37,28 @@ class RouterInstance {
           },
         ),
         GoRoute(
-          path: '/loginController',
-          name: LoginController.routeName,
-          builder: (context, state) {
-            return LoginController.screen();
-          },
-          redirect: (context, state) async {
-            final user = FirebaseAuth.instance.currentUser;
+            path: '/loginController',
+            name: LoginController.routeName,
+            builder: (context, state) {
+              return LoginController.screen();
+            },
+            redirect: (context, state) async {
+              final user = FirebaseAuth.instance.currentUser;
 
-            if (user == null) {
-              return null;
-            }
-            return '/';
-          },
-        ),
+              if (user == null) {
+                return null;
+              }
+              return '/';
+            },
+            routes: [
+              GoRoute(
+                path: 'registerController',
+                name: RegisterController.routeName,
+                builder: (context, state) {
+                  return RegisterController.screen();
+                },
+              ),
+            ]),
         GoRoute(
           path: '/dashboardController',
           name: DashboardController.routeName,

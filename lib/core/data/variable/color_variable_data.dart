@@ -25,8 +25,8 @@ enum ColorVariableData {
   light(
     primary: Color(0xFF145999),
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFF145999),
-    onPrimaryContainer: Color(0xFFFFFFFF),
+    primaryContainer: Color(0xFFFFFFFF),
+    onPrimaryContainer: Color(0xFF145999),
     secondary: Color(0xFFF36F21),
     onSecondary: Color(0xFFFFFFFF),
     secondaryContainer: Color(0xFF22B0E5),
