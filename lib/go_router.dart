@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/authentication/presentation/login/login_controller.dart';
 import 'package:five_minus/features/authentication/presentation/register/register_controller.dart';
+import 'package:five_minus/features/authentication/presentation/verify_email/verify_email_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +34,10 @@ class RouterInstance {
             if (user == null) {
               return '/loginController';
             }
+
+            if (!(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) {
+              return '/verifyEmailController';
+            }
             return null;
           },
         ),
@@ -60,6 +65,21 @@ class RouterInstance {
               ),
             ]),
         GoRoute(
+          path: '/verifyEmailController',
+          name: VerifyEmailController.routeName,
+          builder: (context, state) {
+            return VerifyEmailController.screen();
+          },
+          redirect: (context, state) async {
+            final user = FirebaseAuth.instance.currentUser;
+
+            if (user != null) {
+              return null;
+            }
+            return '/';
+          },
+        ),
+        GoRoute(
           path: '/dashboardController',
           name: DashboardController.routeName,
           builder: (context, state) {
@@ -83,6 +103,10 @@ class RouterInstance {
   Widget defaultBuilder(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return LoginController.screen();
+    if (!(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) {
+      return VerifyEmailController.screen();
+    }
+
     return DashboardController.screen();
   }
 }

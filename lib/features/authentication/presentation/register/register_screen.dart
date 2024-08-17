@@ -61,7 +61,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Container(
                         width: 500,
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: PasswordFormField(passwordController: pwdController),
+                        child: PasswordFormField(
+                          passwordController: pwdController,
+                          textInputAction: TextInputAction.next,
+                        ),
                       ),
                       //Confirm Password
                       Container(

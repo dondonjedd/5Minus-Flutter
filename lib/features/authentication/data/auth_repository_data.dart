@@ -53,6 +53,15 @@ class AuthRepositoryData {
     }
   }
 
+  ResultFutureServer<bool> sendEmailVerification() async {
+    try {
+      final result = await _networkDatasource.sendEmailVerification();
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
   ResultFutureServer<bool> signOut() async {
     try {
       final result = await _networkDatasource.signOut();

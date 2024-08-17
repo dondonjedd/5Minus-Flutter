@@ -25,7 +25,17 @@ class AuthNetworkDatasource {
         email: emailAddress,
         password: password,
       );
-      FirebaseAuth.instance.currentUser?.sendEmailVerification();
+      return await sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      throw ServerException(title: e.code, message: e.message ?? 'Login Error', statusCode: '999', type: '2');
+    } catch (e) {
+      throw const ServerException(title: 'Login error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
+    }
+  }
+
+  Future<bool> sendEmailVerification() async {
+    try {
+      await FirebaseAuth.instance.currentUser?.sendEmailVerification();
 
       return true;
     } on FirebaseAuthException catch (e) {

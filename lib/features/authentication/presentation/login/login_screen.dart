@@ -1,8 +1,6 @@
 import 'package:five_minus/core/component/input/password_form_field.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
-
-import '../../../../core/component/button/text_button_component.dart';
 import '../../../../core/component/template/screen_template_view.dart';
 import 'login_controller.dart';
 
@@ -10,7 +8,7 @@ class LoginScreen extends StatelessWidget {
   final LoginController controller;
   final TextEditingController emailInputController = TextEditingController();
   final TextEditingController passwordInputController = TextEditingController();
-  GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   LoginScreen({super.key, required this.controller});
 

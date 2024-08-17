@@ -31,6 +31,7 @@ class _PasswordFormFieldState extends State<PasswordFormField> {
         },
         decoration: InputDecoration(
           suffixIcon: IconButton(
+            focusNode: FocusNode(skipTraversal: true),
             icon: Icon(
               _isPasswordHidden ? Icons.visibility_off : Icons.visibility,
               color: const Color(0XFFADADAD),
