@@ -55,52 +55,49 @@ class LoginScreen extends StatelessWidget {
                   child: PasswordFormField(passwordController: passwordInputController)),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
               //sign in
-              TextButtonComponent(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                ),
-                minimumWidth: 300,
-                title: 'Login',
-                foregroundColor: Colors.black,
-                backgroundColor: Colors.white,
-                style: TextButtonStyle.elevated,
+
+              ElevatedButton(
                 onPressed: () {
                   controller.signInEmailPassword(context, emailAddress: emailInputController.text, password: passwordInputController.text);
                 },
+                style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
+                child: const Text('Login'),
               ),
               //sign up
-              TextButtonComponent(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                ),
-                minimumWidth: 300,
-                title: 'Register',
-                foregroundColor: Colors.black,
-                backgroundColor: Colors.white,
-                style: TextButtonStyle.elevated,
+              const Padding(padding: EdgeInsets.only(bottom: 12)),
+              ElevatedButton(
                 onPressed: () {
                   controller.navigateRegister(context);
                 },
+                style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
+                child: const Text('Register'),
               ),
+              const Padding(padding: EdgeInsets.only(bottom: 12)),
               //sign in or sign up with google
-              TextButtonComponent(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                ),
-                minimumWidth: 300,
-                title: 'Login/Register With Google',
-                prefixIcon: Image.asset(
-                  AssetPath.googleIcon,
-                  fit: BoxFit.contain,
-                  width: 24,
-                  height: 24,
-                ),
-                foregroundColor: Colors.black,
-                backgroundColor: Colors.white,
-                style: TextButtonStyle.elevated,
+
+              ElevatedButton(
                 onPressed: () {
                   controller.signInGoogle(context);
                 },
+                style: const ButtonStyle(
+                  maximumSize: WidgetStatePropertyAll(
+                    Size(300, 45),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Expanded(
+                      child: Image.asset(
+                        AssetPath.googleIcon,
+                        fit: BoxFit.contain,
+                        width: 24,
+                        height: 24,
+                      ),
+                    ),
+                    const Expanded(flex: 4, child: Text('Login/Register With Google')),
+                  ],
+                ),
               ),
               const SizedBox(
                 height: 200,

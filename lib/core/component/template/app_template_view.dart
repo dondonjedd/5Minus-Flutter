@@ -93,6 +93,7 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
           fillColor: ColorVariableData.light.primaryContainer,
           filled: true,
         ),
+        elevatedButtonTheme: const ElevatedButtonThemeData(style: ButtonStyle(foregroundColor: WidgetStatePropertyAll(Colors.black))),
         colorScheme: ColorScheme.light(
           brightness: Brightness.light,
           primary: ColorVariableData.light.primary,
