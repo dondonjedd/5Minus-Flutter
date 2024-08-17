@@ -77,6 +77,7 @@ class ScreenTemplateView extends StatelessWidget {
         canPop: onBackOverride == null,
         child: Scaffold(
           appBar: AppBar(
+            forceMaterialTransparency: true,
             title: _infoComponent(
               iconPrefix: infoIconPrefix,
               iconSuffix: infoIconSuffix,
