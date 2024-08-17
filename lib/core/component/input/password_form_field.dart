@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 class PasswordFormField extends StatefulWidget {
   final TextEditingController passwordController;
   final String? labelText;
-  const PasswordFormField({super.key, required this.passwordController, this.labelText});
+  final TextInputAction? textInputAction;
+  final String? Function(String?)? extraValidator;
+  const PasswordFormField({super.key, required this.passwordController, this.labelText, this.textInputAction, this.extraValidator});
 
   @override
   State<PasswordFormField> createState() => _PasswordFormFieldState();
@@ -20,33 +22,25 @@ class _PasswordFormFieldState extends State<PasswordFormField> {
         },
         style: const TextStyle(color: Colors.black),
         obscureText: _isPasswordHidden,
-        decoration: PasswordDecoration(
-          isPasswordHidden: _isPasswordHidden,
-          passwordlabelText: widget.labelText,
-          onToggleEye: () {
-            _isPasswordHidden = !_isPasswordHidden;
-            setState(() {});
-          },
+        textInputAction: widget.textInputAction,
+        validator: (value) {
+          if (value?.isEmpty ?? true) {
+            return '${widget.labelText ?? 'Password'} is required';
+          }
+          return widget.extraValidator?.call(value);
+        },
+        decoration: InputDecoration(
+          suffixIcon: IconButton(
+            icon: Icon(
+              _isPasswordHidden ? Icons.visibility_off : Icons.visibility,
+              color: const Color(0XFFADADAD),
+            ),
+            onPressed: () {
+              _isPasswordHidden = !_isPasswordHidden;
+              setState(() {});
+            },
+          ),
+          labelText: widget.labelText ?? 'Password',
         ));
   }
-}
-
-class PasswordDecoration extends InputDecoration {
-  final bool isPasswordHidden;
-  final String? passwordlabelText;
-  final Function() onToggleEye;
-
-  const PasswordDecoration({required this.isPasswordHidden, required this.onToggleEye, this.passwordlabelText})
-      : super(labelText: passwordlabelText ?? 'Password');
-
-  @override
-  Widget? get suffixIcon => IconButton(
-        icon: Icon(
-          isPasswordHidden ? Icons.visibility_off : Icons.visibility,
-          color: const Color(0XFFADADAD),
-        ),
-        onPressed: () {
-          onToggleEye.call();
-        },
-      );
 }

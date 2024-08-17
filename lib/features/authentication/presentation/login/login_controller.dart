@@ -29,19 +29,6 @@ class LoginController {
     );
   }
 
-  void registerEmailPassword(final BuildContext context, {required String emailAddress, required String password}) async {
-    LoadingOverlay().show(context);
-
-    final result = await repositoryData.registerEmailPassword(emailAddress: emailAddress, password: password);
-    LoadingOverlay().hide();
-    result.fold(
-      (failure) {
-        DialogUtility().showError(context, title: failure.title, message: failure.errorMessage, type: failure.type);
-      },
-      (success) {},
-    );
-  }
-
   void signInGoogle(BuildContext context) async {
     LoadingOverlay().show(context);
     final result = await repositoryData.signInGoogle();

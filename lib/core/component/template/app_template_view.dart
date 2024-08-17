@@ -90,9 +90,9 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
           displayColor: Colors.white,
         ),
         inputDecorationTheme: InputDecorationTheme(
-          fillColor: ColorVariableData.light.primaryContainer,
-          filled: true,
-        ),
+            fillColor: ColorVariableData.light.primaryContainer,
+            filled: true,
+            errorBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.red))),
         elevatedButtonTheme: const ElevatedButtonThemeData(style: ButtonStyle(foregroundColor: WidgetStatePropertyAll(Colors.black))),
         colorScheme: ColorScheme.light(
           brightness: Brightness.light,
