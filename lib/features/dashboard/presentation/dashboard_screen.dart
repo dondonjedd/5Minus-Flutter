@@ -12,15 +12,6 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userDetails = controller.getUserDetails();
     return ScreenTemplateView(
-      prefixAction: Row(
-        children: [
-          const Padding(padding: EdgeInsets.only(left: 24)),
-          Text(
-            userDetails?.username ?? '-',
-            style: const TextStyle(fontSize: 18),
-          ),
-        ],
-      ),
       suffixActionList: [
         Container(
           decoration: BoxDecoration(border: Border.all(color: Colors.white), borderRadius: BorderRadius.circular(10)),
@@ -34,8 +25,13 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             children: [
               SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.15,
+                height: MediaQuery.sizeOf(context).height * 0.1,
               ),
+              Text(
+                userDetails?.username ?? '-',
+                style: const TextStyle(fontSize: 18),
+              ),
+              const Padding(padding: EdgeInsets.only(bottom: 24)),
               MenuButton(
                 title: 'Find Game',
                 assetPath: AssetPath.findGame,
