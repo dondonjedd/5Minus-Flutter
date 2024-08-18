@@ -47,6 +47,10 @@ class UsernameScreen extends StatelessWidget {
                     if ((value?.length ?? 0) < 5) {
                       return 'Username must contain at least 5 characters';
                     }
+
+                    if ((value?.length ?? 0) > 10) {
+                      return 'Username must contain a maximum of 10 characters';
+                    }
                     return null;
                   },
                 ),

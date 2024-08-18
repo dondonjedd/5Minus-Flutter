@@ -1,3 +1,4 @@
+import 'package:five_minus/features/authentication/model/user_model.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/utility/dialog_utility.dart';
@@ -30,5 +31,18 @@ class DashboardController {
     );
     LoadingOverlay().hide();
     RouterInstance().goRoute?.refresh();
+  }
+
+  UserModel? getUserDetails() {
+    final res = repositoryData.getUserDetails();
+    UserModel? user = res.fold(
+      (failure) {
+        return null;
+      },
+      (success) {
+        return success;
+      },
+    );
+    return user;
   }
 }

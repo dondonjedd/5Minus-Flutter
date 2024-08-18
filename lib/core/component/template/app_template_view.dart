@@ -89,6 +89,12 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
           bodyColor: Colors.white,
           displayColor: Colors.white,
         ),
+        appBarTheme: const AppBarTheme(
+            titleTextStyle: TextStyle(color: Colors.white),
+            foregroundColor: Colors.white,
+            actionsIconTheme: IconThemeData(
+              color: Colors.white,
+            )),
         inputDecorationTheme: InputDecorationTheme(
             fillColor: ColorVariableData.light.primaryContainer,
             filled: true,
