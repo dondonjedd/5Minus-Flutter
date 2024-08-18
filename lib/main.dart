@@ -1,18 +1,24 @@
 import 'dart:developer';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:five_minus/core/component/template/app_template_view.dart';
+import 'package:five_minus/core/utility/key_value_utility.dart';
+import 'package:five_minus/firebase_options.dart';
 import 'package:five_minus/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'core/utility/app_utility.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  await Firebase.initializeApp();
+  await KeyValueUtility().initialise();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+  );
 
   // FlutterError.onError = (errorDetails) {
   //   FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
@@ -30,16 +36,6 @@ void main() async {
   // await DeviceInfoUtility().initialise();
 
   final goRoute = RouterInstance().intialise();
-
-  FirebaseAuth.instance.authStateChanges().listen((User? user) {
-    if (user == null) {
-      log('User is currently signed out!');
-      goRoute?.refresh();
-    } else {
-      log('User is signed in!');
-      goRoute?.refresh();
-    }
-  });
 
   // AuthCubit authCubit = AuthCubit();
   // await authCubit.initialize();

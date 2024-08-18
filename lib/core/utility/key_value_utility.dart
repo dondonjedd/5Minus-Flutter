@@ -60,4 +60,8 @@ class KeyValueUtility {
   Future<bool> clear() async {
     return (_sharedPreferences).clear();
   }
+
+  Future<bool> remove(final String key) async {
+    return (_sharedPreferences).remove(key);
+  }
 }

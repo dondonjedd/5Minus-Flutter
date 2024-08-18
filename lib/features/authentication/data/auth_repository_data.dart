@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:five_minus/features/authentication/model/user_model.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utility/typedefs.dart';
@@ -16,26 +17,9 @@ class AuthRepositoryData {
 //   (success) {
 //   },
 // );
-  static ResultFutureServer<bool> callNetwork({
-    required String param,
-    required String token,
-    required String sessionId,
-    required String hostAddress,
-  }) async {
-    try {
-      final result = await _networkDatasource.networkCall(
-        param: param,
-        token: token,
-        sessionId: sessionId,
-        hostAddress: hostAddress,
-      );
-      return Right(result);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
-    }
-  }
 
-  ResultFutureServer<bool> signInWithEmailAndPassword({required String emailAddress, required String password}) async {
+//**************************SIGN IN */
+  ResultFutureServer<UserModel?> signInWithEmailAndPassword({required String emailAddress, required String password}) async {
     try {
       final result = await _networkDatasource.signInEmailPassword(emailAddress: emailAddress, password: password);
       return Right(result);
@@ -44,9 +28,50 @@ class AuthRepositoryData {
     }
   }
 
-  ResultFutureServer<bool> registerEmailPassword({required String emailAddress, required String password}) async {
+  ResultFutureServer<UserModel?> signInGoogle() async {
+    try {
+      final result = await _networkDatasource.signInGoogle();
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
+  //**************************SIGN IN */
+  //**************************REGISTER */
+  ResultFutureServer<UserModel?> registerEmailPassword({required String emailAddress, required String password}) async {
     try {
       final result = await _networkDatasource.registerEmailPassword(emailAddress: emailAddress, password: password);
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
+  //**************************REGISTER */
+  //**************************LOG OUT */
+  ResultFutureServer<bool> signOut() async {
+    try {
+      final result = await _networkDatasource.signOut();
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+  //**************************LOG OUT */
+
+  ResultFutureServer<UserModel?> getUserModelNetwork() async {
+    try {
+      final result = await _networkDatasource.getUserModel();
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
+  ResultFutureServer<UserModel?> updateUserNetwork(UserModel? usermodel) async {
+    try {
+      final result = await _networkDatasource.updateUser(usermodel);
       return Right(result);
     } on ServerException catch (e) {
       return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
@@ -62,38 +87,31 @@ class AuthRepositoryData {
     }
   }
 
-  ResultFutureServer<bool> signOut() async {
+  ResultCache<UserModel?> getUserDetails() {
     try {
-      final result = await _networkDatasource.signOut();
-      return Right(result);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+      String? model = _localDatasource.getUserDetails();
+      if (model == null) throw const CacheException(message: 'Not initialized');
+      return Right(UserModel.fromJson(model));
+    } on CacheException catch (e) {
+      return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
     }
   }
 
-  ResultFutureServer<bool> signInGoogle() async {
+  ResultVoid setUserDetails({required UserModel? userModel}) async {
     try {
-      final result = await _networkDatasource.signInGoogle();
-      return Right(result);
-    } on ServerException catch (e) {
-      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+      await _localDatasource.setUserDetails(userModel?.toJson());
+      return const Right(null);
+    } on CacheException catch (e) {
+      return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
     }
   }
-  // ResultCache<String> string() {
-  //   try {
-  //     String? model = _localDatasource.string();
-  //     return Right(model);
-  //   } on CacheException catch (e) {
-  //     return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
-  //   }
-  // }
 
-  // ResultVoid setString({required String model}) async {
-  //   try {
-  //     await _localDatasource.setString(model);
-  //     return const Right(null);
-  //   } on CacheException catch (e) {
-  //     return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
-  //   }
-  // }
+  Future<ResultCache<bool>> clearAuth() async {
+    try {
+      final res = await _localDatasource.clear();
+      return Right(res);
+    } on CacheException catch (e) {
+      return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
 }

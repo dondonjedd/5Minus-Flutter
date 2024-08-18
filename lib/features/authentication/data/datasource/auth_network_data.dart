@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/features/authentication/model/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -8,10 +10,10 @@ import '../../../../core/utility/network_utility.dart';
 class AuthNetworkDatasource {
   const AuthNetworkDatasource();
 
-  Future<bool> signInEmailPassword({required String emailAddress, required String password}) async {
+  Future<UserModel?> signInEmailPassword({required String emailAddress, required String password}) async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(email: emailAddress, password: password);
-      return true;
+      return await getUserModel();
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Login Error', statusCode: '999', type: '2');
     } catch (e) {
@@ -19,17 +21,49 @@ class AuthNetworkDatasource {
     }
   }
 
-  Future<bool> registerEmailPassword({required String emailAddress, required String password}) async {
+  Future<UserModel?> registerEmailPassword({required String emailAddress, required String password}) async {
     try {
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailAddress,
         password: password,
       );
-      return await sendEmailVerification();
+      await sendEmailVerification();
+      return await _createUser();
     } on FirebaseAuthException catch (e) {
-      throw ServerException(title: e.code, message: e.message ?? 'Login Error', statusCode: '999', type: '2');
+      throw ServerException(title: e.code, message: e.message ?? 'Register error', statusCode: '999', type: '2');
     } catch (e) {
-      throw const ServerException(title: 'Login error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
+      throw const ServerException(title: 'Register error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
+    }
+  }
+
+  Future<UserModel?> getUserModel() async {
+    try {
+      final userCollection = _getUserCollection();
+      if (userCollection == null) return null;
+      final result = await userCollection.get();
+      if (result.data()?.isEmpty ?? true) {
+        return _createUser();
+      }
+      return UserModel.fromMap(result.data());
+    } on FirebaseException catch (e) {
+      throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
+    } catch (e) {
+      throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
+    }
+  }
+
+  Future<UserModel?> updateUser(UserModel? usermodel) async {
+    try {
+      if (usermodel == null) return null;
+      final userCollection = _getUserCollection();
+      if (userCollection == null) return null;
+      await userCollection.set(usermodel.toMap());
+
+      return getUserModel();
+    } on FirebaseException catch (e) {
+      throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
+    } catch (e) {
+      throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }
   }
 
@@ -56,7 +90,7 @@ class AuthNetworkDatasource {
     }
   }
 
-  Future<bool> signInGoogle() async {
+  Future<UserModel?> signInGoogle() async {
     try {
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
@@ -71,15 +105,36 @@ class AuthNetworkDatasource {
       );
 
       // Once signed in, return the UserCredential
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      UserCredential user = await FirebaseAuth.instance.signInWithCredential(credential);
 
       await GoogleSignIn().signOut(); // <-- add this code here
-      return true;
+      if (user.additionalUserInfo?.isNewUser ?? false) return await _createUser();
+      return await getUserModel();
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Login Error', statusCode: '999', type: '2');
     } catch (e) {
       throw const ServerException(title: 'Logout error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }
+  }
+
+  Future<UserModel?> _createUser() async {
+    try {
+      final userCollection = _getUserCollection();
+      if (userCollection == null) return null;
+
+      await userCollection.set(UserModel.baseUserModel().toMap());
+      return UserModel.fromMap((await userCollection.get()).data());
+    } on FirebaseAuthException catch (e) {
+      throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
+    } catch (e) {
+      throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
+    }
+  }
+
+  DocumentReference<Map<String, dynamic>>? _getUserCollection() {
+    String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+    return FirebaseFirestore.instance.collection("users").doc(uid);
   }
 
   Future<bool> networkCall({

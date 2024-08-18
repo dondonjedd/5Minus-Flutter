@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/utility/dialog_utility.dart';
 import '../../../core/utility/loading_overlay_utility.dart';
+import '../../../go_router.dart';
 import '../../authentication/data/auth_repository_data.dart';
 import 'dashboard_screen.dart';
 
@@ -17,15 +18,17 @@ class DashboardController {
 
   void signOut(final BuildContext context) async {
     LoadingOverlay().show(context);
-
     final result = await repositoryData.signOut();
     LoadingOverlay().hide();
-
-    result.fold(
+    await result.fold(
       (failure) {
         DialogUtility().showError(context, title: failure.title, message: failure.errorMessage, type: failure.type);
       },
-      (success) {},
+      (success) async {
+        await repositoryData.clearAuth();
+      },
     );
+    LoadingOverlay().hide();
+    RouterInstance().goRoute?.refresh();
   }
 }

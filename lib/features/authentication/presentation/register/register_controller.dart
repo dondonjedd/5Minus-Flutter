@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/utility/dialog_utility.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
+import '../../../../go_router.dart';
 import '../../data/auth_repository_data.dart';
 import 'register_screen.dart';
 
@@ -18,12 +19,17 @@ class RegisterController {
     LoadingOverlay().show(context);
 
     final result = await repositoryData.registerEmailPassword(emailAddress: emailAddress, password: password);
-    LoadingOverlay().hide();
-    result.fold(
+
+    await result.fold(
       (failure) {
         DialogUtility().showError(context, title: failure.title, message: failure.errorMessage, type: failure.type);
       },
-      (success) {},
+      (userModel) async {
+        if (userModel == null) return;
+        await repositoryData.setUserDetails(userModel: userModel);
+      },
     );
+    LoadingOverlay().hide();
+    RouterInstance().goRoute?.refresh();
   }
 }

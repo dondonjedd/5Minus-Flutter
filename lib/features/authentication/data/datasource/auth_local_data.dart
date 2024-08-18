@@ -1,23 +1,27 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/utility/key_value_utility.dart';
 
-const _string = 'string';
+const _user = 'user';
 
 class AuthLocalDatasource {
   const AuthLocalDatasource();
-  Future<bool> setString(final String token) async {
+  Future<bool> setUserDetails(String? userModel) async {
     try {
-      return await KeyValueUtility().setString(_string, token);
+      return await KeyValueUtility().setString(_user, userModel ?? '');
     } catch (e) {
       throw CacheException(message: e.toString());
     }
   }
 
-  String string() {
+  String? getUserDetails() {
     try {
-      return KeyValueUtility().getString(_string) ?? '';
+      return KeyValueUtility().getString(_user);
     } catch (e) {
       throw CacheException(message: e.toString());
     }
+  }
+
+  Future<bool> clear() async {
+    return await KeyValueUtility().remove(_user);
   }
 }

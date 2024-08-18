@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/utility/dialog_utility.dart';
+import '../../../../go_router.dart';
 import '../../data/auth_repository_data.dart';
 import 'verify_email_screen.dart';
 
@@ -55,11 +56,15 @@ class VerifyEmailController {
     LoadingOverlay().show(context);
     final result = await repositoryData.signOut();
     LoadingOverlay().hide();
-    result.fold(
+    await result.fold(
       (failure) {
         DialogUtility().showError(context, title: failure.title, message: failure.errorMessage, type: failure.type);
       },
-      (success) {},
+      (success) async {
+        await repositoryData.clearAuth();
+      },
     );
+    LoadingOverlay().hide();
+    RouterInstance().goRoute?.refresh();
   }
 }

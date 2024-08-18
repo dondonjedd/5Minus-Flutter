@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/features/authentication/data/auth_repository_data.dart';
 import 'package:five_minus/features/authentication/presentation/login/login_controller.dart';
 import 'package:five_minus/features/authentication/presentation/register/register_controller.dart';
+import 'package:five_minus/features/authentication/presentation/username/username_controller.dart';
 import 'package:five_minus/features/authentication/presentation/verify_email/verify_email_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +40,18 @@ class RouterInstance {
             if (!(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) {
               return '/verifyEmailController';
             }
-            return null;
+            final res = AuthRepositoryData().getUserDetails();
+            return res.fold(
+              (failure) {
+                return null;
+              },
+              (model) {
+                if (model?.username?.isEmpty ?? true) {
+                  return '/usernameController';
+                }
+                return null;
+              },
+            );
           },
         ),
         GoRoute(
@@ -80,6 +93,21 @@ class RouterInstance {
           },
         ),
         GoRoute(
+          path: '/usernameController',
+          name: UsernameController.routeName,
+          builder: (context, state) {
+            return UsernameController.screen();
+          },
+          redirect: (context, state) async {
+            final user = FirebaseAuth.instance.currentUser;
+
+            if (user != null) {
+              return null;
+            }
+            return '/';
+          },
+        ),
+        GoRoute(
           path: '/dashboardController',
           name: DashboardController.routeName,
           builder: (context, state) {
@@ -107,6 +135,17 @@ class RouterInstance {
       return VerifyEmailController.screen();
     }
 
-    return DashboardController.screen();
+    final res = AuthRepositoryData().getUserDetails();
+    return res.fold(
+      (failure) {
+        return DashboardController.screen();
+      },
+      (model) {
+        if (model?.username?.isEmpty ?? true) {
+          return UsernameController.screen();
+        }
+        return DashboardController.screen();
+      },
+    );
   }
 }
