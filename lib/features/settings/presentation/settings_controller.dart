@@ -1,21 +1,18 @@
-import 'package:five_minus/features/authentication/model/user_model.dart';
-import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/utility/dialog_utility.dart';
 import '../../../core/utility/loading_overlay_utility.dart';
 import '../../../go_router.dart';
 import '../../authentication/data/auth_repository_data.dart';
-import 'dashboard_screen.dart';
+import 'settings_screen.dart';
 
-class DashboardController {
-  static const String routeName = '/DashboardController';
+class SettingsController {
+  static const String routeName = '/SettingsController';
   static Widget screen() {
-    return DashboardScreen(controller: DashboardController._());
+    return SettingsScreen(controller: SettingsController._());
   }
 
-  DashboardController._();
+  SettingsController._();
 
   AuthRepositoryData repositoryData = AuthRepositoryData();
 
@@ -33,22 +30,5 @@ class DashboardController {
     );
     LoadingOverlay().hide();
     RouterInstance().goRoute?.refresh();
-  }
-
-  navigateSettings(BuildContext context) {
-    context.goNamed(SettingsController.routeName);
-  }
-
-  UserModel? getUserDetails() {
-    final res = repositoryData.getUserDetails();
-    UserModel? user = res.fold(
-      (failure) {
-        return null;
-      },
-      (success) {
-        return success;
-      },
-    );
-    return user;
   }
 }

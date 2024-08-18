@@ -59,7 +59,9 @@ class DashboardScreen extends StatelessWidget {
               MenuButton(
                 title: 'Settings',
                 assetPath: AssetPath.settings,
-                onTap: () {},
+                onTap: () {
+                  controller.navigateSettings(context);
+                },
               ),
               SizedBox(
                 height: MediaQuery.sizeOf(context).height * 0.15,

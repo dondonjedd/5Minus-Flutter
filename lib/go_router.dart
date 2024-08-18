@@ -5,6 +5,7 @@ import 'package:five_minus/features/authentication/presentation/register/registe
 import 'package:five_minus/features/authentication/presentation/username/username_controller.dart';
 import 'package:five_minus/features/authentication/presentation/verify_email/verify_email_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -55,28 +56,29 @@ class RouterInstance {
           },
         ),
         GoRoute(
-            path: '/loginController',
-            name: LoginController.routeName,
-            builder: (context, state) {
-              return LoginController.screen();
-            },
-            redirect: (context, state) async {
-              final user = FirebaseAuth.instance.currentUser;
+          path: '/loginController',
+          name: LoginController.routeName,
+          builder: (context, state) {
+            return LoginController.screen();
+          },
+          redirect: (context, state) async {
+            final user = FirebaseAuth.instance.currentUser;
 
-              if (user == null) {
-                return null;
-              }
-              return '/';
-            },
-            routes: [
-              GoRoute(
-                path: 'registerController',
-                name: RegisterController.routeName,
-                builder: (context, state) {
-                  return RegisterController.screen();
-                },
-              ),
-            ]),
+            if (user == null) {
+              return null;
+            }
+            return '/';
+          },
+          routes: [
+            GoRoute(
+              path: 'registerController',
+              name: RegisterController.routeName,
+              builder: (context, state) {
+                return RegisterController.screen();
+              },
+            ),
+          ],
+        ),
         GoRoute(
           path: '/verifyEmailController',
           name: VerifyEmailController.routeName,
@@ -121,6 +123,15 @@ class RouterInstance {
             }
             return '/';
           },
+          routes: [
+            GoRoute(
+              path: 'settingsController',
+              name: SettingsController.routeName,
+              builder: (context, state) {
+                return SettingsController.screen();
+              },
+            ),
+          ],
         ),
       ],
     );
