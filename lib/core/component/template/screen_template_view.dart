@@ -92,7 +92,6 @@ class ScreenTemplateView extends StatelessWidget {
             surfaceTintColor: enableOverlapHeader ? Colors.transparent : null,
             backgroundColor: enableOverlapHeader ? Colors.transparent : backgroundColor,
             elevation: enableOverlapHeader ? 0 : null,
-            leadingWidth: double.infinity,
             leading: prefixAction ??
                 (onBackOverride == null
                     ? null
