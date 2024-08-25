@@ -1,12 +1,7 @@
-import 'package:five_minus/features/authentication/model/user_model.dart';
+import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../../core/utility/dialog_utility.dart';
-import '../../../core/utility/loading_overlay_utility.dart';
-import '../../../go_router.dart';
-import '../../authentication/data/auth_repository_data.dart';
 import 'dashboard_screen.dart';
 
 class DashboardController {
@@ -17,38 +12,22 @@ class DashboardController {
 
   DashboardController._();
 
-  AuthRepositoryData repositoryData = AuthRepositoryData();
-
-  void signOut(final BuildContext context) async {
-    LoadingOverlay().show(context);
-    final result = await repositoryData.signOut();
-    LoadingOverlay().hide();
-    await result.fold(
-      (failure) {
-        DialogUtility().showError(context, title: failure.title, message: failure.errorMessage, type: failure.type);
-      },
-      (success) async {
-        await repositoryData.clearAuth();
-      },
-    );
-    LoadingOverlay().hide();
-    RouterInstance().goRoute?.refresh();
-  }
+  final AugDataRepository _augDataRepository = AugDataRepository();
 
   navigateSettings(BuildContext context) {
     context.goNamed(SettingsController.routeName);
   }
 
-  UserModel? getUserDetails() {
-    final res = repositoryData.getUserDetails();
-    UserModel? user = res.fold(
-      (failure) {
-        return null;
-      },
-      (success) {
-        return success;
-      },
-    );
-    return user;
-  }
+  // UserModel? getUserDetails() {
+  //   final res = _augDataRepository.getUserDetails();
+  //   UserModel? user = res.fold(
+  //     (failure) {
+  //       return null;
+  //     },
+  //     (success) {
+  //       return success;
+  //     },
+  //   );
+  //   return user;
+  // }
 }

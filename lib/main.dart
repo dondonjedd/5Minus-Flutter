@@ -1,9 +1,8 @@
-import 'dart:developer';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:five_minus/core/component/template/app_template_view.dart';
 import 'package:five_minus/core/utility/key_value_utility.dart';
+import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/firebase_options.dart';
 import 'package:five_minus/go_router.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +33,17 @@ void main() async {
   // await KeyValueUtility().initialise();
 
   // await DeviceInfoUtility().initialise();
+  AugDataRepository augDataRepository = AugDataRepository();
+
+  final result2 = await augDataRepository.getIsUserSignedIn();
+  await result2.fold(
+    (failure) {},
+    (isSuccess) async {
+      await augDataRepository.setIsSignedIn(bol: isSuccess);
+
+      if (isSuccess) return true;
+    },
+  );
 
   final goRoute = RouterInstance().intialise();
 

@@ -10,13 +10,13 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userDetails = controller.getUserDetails();
+    // final userDetails = controller.getUserDetails();
     return ScreenTemplateView(
       suffixActionList: [
         Container(
           decoration: BoxDecoration(border: Border.all(color: Colors.white), borderRadius: BorderRadius.circular(10)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-          child: Text('${userDetails?.wins.toString() ?? 0}W ${userDetails?.loss.toString() ?? 0}L ${userDetails?.points.toString() ?? 0}pts'),
+          child: const Text('${0}W ${0}L ${0}pts'),
         )
       ],
       layout: SizedBox(
@@ -27,9 +27,9 @@ class DashboardScreen extends StatelessWidget {
               SizedBox(
                 height: MediaQuery.sizeOf(context).height * 0.1,
               ),
-              Text(
-                userDetails?.username ?? '-',
-                style: const TextStyle(fontSize: 18),
+              const Text(
+                '-',
+                style: TextStyle(fontSize: 18),
               ),
               const Padding(padding: EdgeInsets.only(bottom: 24)),
               MenuButton(

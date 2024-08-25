@@ -12,7 +12,20 @@
           "package_name": "com.five_minus.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "74700725365-6qjqo0e0jp5on92ktfrleuqsbh597v7q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.five_minus.app",
+            "certificate_hash": "2ebf498a1d50827ccee5d125e90865d273dfc5e8"
+          }
+        },
+        {
+          "client_id": "74700725365-h4f88e2mv14d5agpliaf6o5rfp3h5224.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAciYnoOoejpisAqzQE0aqLFerUxMTrqPU"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "74700725365-h4f88e2mv14d5agpliaf6o5rfp3h5224.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "74700725365-qparpkkm7urp20agqfss2ms2ltp2gk8m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.fiveMinus"
+              }
+            }
+          ]
         }
       }
     }

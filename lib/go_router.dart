@@ -1,9 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/features/authentication/data/auth_repository_data.dart';
-import 'package:five_minus/features/authentication/presentation/login/login_controller.dart';
+import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
+import 'package:five_minus/features/auth_game_services/presentation/authenticating_controller.dart';
 import 'package:five_minus/features/authentication/presentation/register/register_controller.dart';
-import 'package:five_minus/features/authentication/presentation/username/username_controller.dart';
-import 'package:five_minus/features/authentication/presentation/verify_email/verify_email_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +16,7 @@ class RouterInstance {
   }
 
   factory RouterInstance() => _instance ?? RouterInstance._internal();
+  final AugDataRepository _augDataRepository = AugDataRepository();
 
   GoRouter? intialise() {
     goRoute = GoRouter(
@@ -31,24 +29,15 @@ class RouterInstance {
           builder: (context, state) {
             return defaultBuilder(context);
           },
-          redirect: (context, state) async {
-            final user = FirebaseAuth.instance.currentUser;
-
-            if (user == null) {
-              return '/loginController';
-            }
-
-            if (!(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) {
-              return '/verifyEmailController';
-            }
-            final res = AuthRepositoryData().getUserDetails();
+          redirect: (context, state) {
+            final res = _augDataRepository.getIsSignedInLocal();
             return res.fold(
               (failure) {
                 return null;
               },
-              (model) {
-                if (model?.username?.isEmpty ?? true) {
-                  return '/usernameController';
+              (isSuccess) {
+                if (!isSuccess) {
+                  return '/authenticatingController';
                 }
                 return null;
               },
@@ -56,57 +45,24 @@ class RouterInstance {
           },
         ),
         GoRoute(
-          path: '/loginController',
-          name: LoginController.routeName,
+          path: '/authenticatingController',
+          name: AuthenticatingController.routeName,
           builder: (context, state) {
-            return LoginController.screen();
+            return AuthenticatingController.screen();
           },
           redirect: (context, state) async {
-            final user = FirebaseAuth.instance.currentUser;
-
-            if (user == null) {
-              return null;
-            }
-            return '/';
-          },
-          routes: [
-            GoRoute(
-              path: 'registerController',
-              name: RegisterController.routeName,
-              builder: (context, state) {
-                return RegisterController.screen();
+            final res = _augDataRepository.getIsSignedInLocal();
+            return res.fold(
+              (failure) {
+                return null;
               },
-            ),
-          ],
-        ),
-        GoRoute(
-          path: '/verifyEmailController',
-          name: VerifyEmailController.routeName,
-          builder: (context, state) {
-            return VerifyEmailController.screen();
-          },
-          redirect: (context, state) async {
-            final user = FirebaseAuth.instance.currentUser;
-
-            if (user != null) {
-              return null;
-            }
-            return '/';
-          },
-        ),
-        GoRoute(
-          path: '/usernameController',
-          name: UsernameController.routeName,
-          builder: (context, state) {
-            return UsernameController.screen();
-          },
-          redirect: (context, state) async {
-            final user = FirebaseAuth.instance.currentUser;
-
-            if (user != null) {
-              return null;
-            }
-            return '/';
+              (isSuccess) {
+                if (isSuccess) {
+                  return '/';
+                }
+                return null;
+              },
+            );
           },
         ),
         GoRoute(
@@ -115,13 +71,19 @@ class RouterInstance {
           builder: (context, state) {
             return DashboardController.screen();
           },
-          redirect: (context, state) async {
-            final user = FirebaseAuth.instance.currentUser;
-
-            if (user != null) {
-              return null;
-            }
-            return '/';
+          redirect: (context, state) {
+            final res = _augDataRepository.getIsSignedInLocal();
+            return res.fold(
+              (failure) {
+                return null;
+              },
+              (isSuccess) {
+                if (!isSuccess) {
+                  return '/authenticatingController';
+                }
+                return null;
+              },
+            );
           },
           routes: [
             GoRoute(
@@ -140,23 +102,36 @@ class RouterInstance {
   }
 
   Widget defaultBuilder(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return LoginController.screen();
-    if (!(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) {
-      return VerifyEmailController.screen();
-    }
-
-    final res = AuthRepositoryData().getUserDetails();
+    final res = _augDataRepository.getIsSignedInLocal();
     return res.fold(
       (failure) {
-        return DashboardController.screen();
+        return AuthenticatingController.screen();
       },
-      (model) {
-        if (model?.username?.isEmpty ?? true) {
-          return UsernameController.screen();
+      (isSuccess) {
+        if (!isSuccess) {
+          return AuthenticatingController.screen();
         }
         return DashboardController.screen();
       },
     );
+
+    // final user = FirebaseAuth.instance.currentUser;
+    // if (user == null) return LoginController.screen();
+    // if (!(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) {
+    //   return VerifyEmailController.screen();
+    // }
+
+    // final res = AuthRepositoryData().getUserDetails();
+    // return res.fold(
+    //   (failure) {
+    //     return DashboardController.screen();
+    //   },
+    //   (model) {
+    //     if (model?.username?.isEmpty ?? true) {
+    //       return UsernameController.screen();
+    //     }
+    //     return DashboardController.screen();
+    //   },
+    // );
   }
 }

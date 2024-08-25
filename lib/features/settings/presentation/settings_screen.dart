@@ -17,13 +17,6 @@ class SettingsScreen extends StatelessWidget {
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.25,
             ),
-            ElevatedButton(
-              onPressed: () {
-                controller.signOut(context);
-              },
-              style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
-              child: const Text('Logout'),
-            ),
             const SizedBox(
               height: 200,
             ),
