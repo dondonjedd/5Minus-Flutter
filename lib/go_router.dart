@@ -1,7 +1,7 @@
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/auth_game_services/presentation/authenticating_controller.dart';
-import 'package:five_minus/features/authentication/presentation/register/register_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:five_minus/features/leaderboard/presentation/leaderboard_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -30,13 +30,13 @@ class RouterInstance {
             return defaultBuilder(context);
           },
           redirect: (context, state) {
-            final res = _augDataRepository.getIsSignedInLocal();
+            final res = _augDataRepository.getUserInfoLocal();
             return res.fold(
               (failure) {
                 return null;
               },
-              (isSuccess) {
-                if (!isSuccess) {
+              (userModel) {
+                if (userModel.isEmpty) {
                   return '/authenticatingController';
                 }
                 return null;
@@ -51,13 +51,13 @@ class RouterInstance {
             return AuthenticatingController.screen();
           },
           redirect: (context, state) async {
-            final res = _augDataRepository.getIsSignedInLocal();
+            final res = _augDataRepository.getUserInfoLocal();
             return res.fold(
               (failure) {
                 return null;
               },
-              (isSuccess) {
-                if (isSuccess) {
+              (userModel) {
+                if (userModel.isNotEmpty) {
                   return '/';
                 }
                 return null;
@@ -72,13 +72,13 @@ class RouterInstance {
             return DashboardController.screen();
           },
           redirect: (context, state) {
-            final res = _augDataRepository.getIsSignedInLocal();
+            final res = _augDataRepository.getUserInfoLocal();
             return res.fold(
               (failure) {
                 return null;
               },
-              (isSuccess) {
-                if (!isSuccess) {
+              (userModel) {
+                if (userModel.isEmpty) {
                   return '/authenticatingController';
                 }
                 return null;
@@ -86,6 +86,13 @@ class RouterInstance {
             );
           },
           routes: [
+            GoRoute(
+              path: 'leaderboardController',
+              name: LeaderboardController.routeName,
+              builder: (context, state) {
+                return LeaderboardController.screen();
+              },
+            ),
             GoRoute(
               path: 'settingsController',
               name: SettingsController.routeName,
@@ -102,13 +109,13 @@ class RouterInstance {
   }
 
   Widget defaultBuilder(BuildContext context) {
-    final res = _augDataRepository.getIsSignedInLocal();
+    final res = _augDataRepository.getUserInfoLocal();
     return res.fold(
       (failure) {
         return AuthenticatingController.screen();
       },
-      (isSuccess) {
-        if (!isSuccess) {
+      (userModel) {
+        if (userModel.isEmpty) {
           return AuthenticatingController.screen();
         }
         return DashboardController.screen();

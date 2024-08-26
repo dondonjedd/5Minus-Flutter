@@ -1,21 +1,21 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/utility/key_value_utility.dart';
 
-const _isSignedIn = 'isSignedIn';
+const _userInfo = 'userInfo';
 
 class AugLocalDatasource {
   const AugLocalDatasource();
-  Future<bool> setIsSignedIn(final bool bol) async {
+  Future<bool> setUserInfo(final String userInfo) async {
     try {
-      return await KeyValueUtility().setBool(_isSignedIn, bol);
+      return await KeyValueUtility().setString(_userInfo, userInfo);
     } catch (e) {
       throw CacheException(message: e.toString());
     }
   }
 
-  bool getIsSignedIn() {
+  String getUserInfo() {
     try {
-      return KeyValueUtility().getBool(_isSignedIn) ?? false;
+      return KeyValueUtility().getString(_userInfo) ?? '';
     } catch (e) {
       throw CacheException(message: e.toString());
     }

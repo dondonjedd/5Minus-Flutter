@@ -1,6 +1,5 @@
-import 'dart:ffi';
-
 import 'package:dartz/dartz.dart';
+import 'package:five_minus/model/pgs_user_model.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utility/typedefs.dart';
@@ -28,10 +27,23 @@ class AugDataRepository {
     }
   }
 
-  ResultFutureServer<bool> getIsUserSignedIn() async {
+  ResultFutureServer<bool> getIsUserSignedInNetwork() async {
     try {
       final result = await _networkDatasource.getIsUserSignedIn();
       return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
+  ResultFutureServer<PgsUserModel> getUserInfoNetwork() async {
+    try {
+      final playerId = await _networkDatasource.getPlayerId();
+      final username = await _networkDatasource.getPlayerName();
+      final score = await _networkDatasource.getPlayerScore();
+      final icon = await _networkDatasource.getPlayerIcon();
+
+      return Right(PgsUserModel(icon: icon, id: playerId, points: score, username: username));
     } on ServerException catch (e) {
       return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
     }
@@ -54,18 +66,18 @@ class AugDataRepository {
     }
   }
 
-  ResultCache<bool> getIsSignedInLocal() {
+  ResultCache<String> getUserInfoLocal() {
     try {
-      bool res = _localDatasource.getIsSignedIn();
+      String res = _localDatasource.getUserInfo();
       return Right(res);
     } on CacheException catch (e) {
       return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
     }
   }
 
-  ResultVoid setIsSignedIn({required bool bol}) async {
+  ResultVoid setUserInfoLocal({required String userInfo}) async {
     try {
-      await _localDatasource.setIsSignedIn(bol);
+      await _localDatasource.setUserInfo(userInfo);
       return const Right(null);
     } on CacheException catch (e) {
       return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));

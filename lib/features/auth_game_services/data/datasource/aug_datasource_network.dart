@@ -23,6 +23,42 @@ class AugNetworkDatasource {
     }
   }
 
+  Future<String> getPlayerId() async {
+    try {
+      final res = await GamesServices.getPlayerID();
+      return res ?? '';
+    } catch (e) {
+      throw ServerException(title: 'Get player info error', message: e.toString(), statusCode: '999');
+    }
+  }
+
+  Future<String> getPlayerName() async {
+    try {
+      final res = await GamesServices.getPlayerName();
+      return res ?? '';
+    } catch (e) {
+      throw ServerException(title: 'Get player info error', message: e.toString(), statusCode: '999');
+    }
+  }
+
+  Future<int> getPlayerScore() async {
+    try {
+      final res = await GamesServices.getPlayerScore(androidLeaderboardID: 'CgkI9biKpJYCEAIQAQ');
+      return res ?? 0;
+    } catch (e) {
+      throw ServerException(title: 'Get player info error', message: e.toString(), statusCode: '999');
+    }
+  }
+
+  Future<String> getPlayerIcon() async {
+    try {
+      final res = await GamesServices.getPlayerIconImage();
+      return res ?? '';
+    } catch (e) {
+      throw ServerException(title: 'Get player info error', message: e.toString(), statusCode: '999');
+    }
+  }
+
   Future<bool> networkCall({
     required final String param,
     required final String token,

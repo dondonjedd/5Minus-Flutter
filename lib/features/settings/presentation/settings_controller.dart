@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../authentication/data/auth_repository_data.dart';
+import '../../../core/component/template/authentication/data/auth_repository_data.dart';
 import 'settings_screen.dart';
 
 class SettingsController {

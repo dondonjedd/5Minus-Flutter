@@ -35,13 +35,33 @@ void main() async {
   // await DeviceInfoUtility().initialise();
   AugDataRepository augDataRepository = AugDataRepository();
 
-  final result2 = await augDataRepository.getIsUserSignedIn();
+  final result2 = await augDataRepository.getIsUserSignedInNetwork();
   await result2.fold(
-    (failure) {},
+    (failure) async {
+      await augDataRepository.setUserInfoLocal(userInfo: '');
+    },
     (isSuccess) async {
-      await augDataRepository.setIsSignedIn(bol: isSuccess);
-
-      if (isSuccess) return true;
+      if (!isSuccess) {
+        await augDataRepository.setUserInfoLocal(userInfo: '');
+      } else {
+        final result3 = await augDataRepository.getUserInfoNetwork();
+        return result3.fold(
+          (failure) {
+            return false;
+          },
+          (model) async {
+            final result4 = await augDataRepository.setUserInfoLocal(userInfo: model.toJson());
+            return result4.fold(
+              (l) {
+                return false;
+              },
+              (r) {
+                return true;
+              },
+            );
+          },
+        );
+      }
     },
   );
 
