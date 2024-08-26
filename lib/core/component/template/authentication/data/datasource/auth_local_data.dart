@@ -1,5 +1,5 @@
-import '../../../../core/errors/exceptions.dart';
-import '../../../../core/utility/key_value_utility.dart';
+import '../../../../../errors/exceptions.dart';
+import '../../../../../utility/key_value_utility.dart';
 
 const _user = 'user';
 

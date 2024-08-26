@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/component/template/screen_template_view.dart';
+import '../../../screen_template_view.dart';
 import 'verify_email_controller.dart';
 
 class VerifyEmailScreen extends StatelessWidget {

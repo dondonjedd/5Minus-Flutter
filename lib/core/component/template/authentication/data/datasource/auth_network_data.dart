@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/features/authentication/model/user_model.dart';
+import 'package:five_minus/core/component/template/authentication/model/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import '../../../../core/errors/exceptions.dart';
-import '../../../../core/utility/network_utility.dart';
+import '../../../../../errors/exceptions.dart';
+import '../../../../../utility/network_utility.dart';
 
 class AuthNetworkDatasource {
   const AuthNetworkDatasource();

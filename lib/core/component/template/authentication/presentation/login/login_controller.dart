@@ -1,7 +1,7 @@
 import 'package:five_minus/core/utility/dialog_utility.dart';
 import 'package:five_minus/core/utility/loading_overlay_utility.dart';
-import 'package:five_minus/features/authentication/data/auth_repository_data.dart';
-import 'package:five_minus/features/authentication/presentation/register/register_controller.dart';
+import 'package:five_minus/core/component/template/authentication/data/auth_repository_data.dart';
+import 'package:five_minus/core/component/template/authentication/presentation/register/register_controller.dart';
 import 'package:five_minus/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';

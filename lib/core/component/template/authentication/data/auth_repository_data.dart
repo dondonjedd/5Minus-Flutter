@@ -1,8 +1,8 @@
 import 'package:dartz/dartz.dart';
-import 'package:five_minus/features/authentication/model/user_model.dart';
-import '../../../core/errors/exceptions.dart';
-import '../../../core/errors/failures.dart';
-import '../../../core/utility/typedefs.dart';
+import 'package:five_minus/core/component/template/authentication/model/user_model.dart';
+import '../../../../errors/exceptions.dart';
+import '../../../../errors/failures.dart';
+import '../../../../utility/typedefs.dart';
 import 'datasource/auth_local_data.dart';
 import 'datasource/auth_network_data.dart';
 

@@ -1,7 +1,7 @@
 import 'package:five_minus/core/component/input/password_form_field.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../core/component/template/screen_template_view.dart';
+import '../../../screen_template_view.dart';
 import 'register_controller.dart';
 
 class RegisterScreen extends StatefulWidget {

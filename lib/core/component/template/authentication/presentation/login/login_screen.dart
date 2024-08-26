@@ -1,7 +1,7 @@
 import 'package:five_minus/core/component/input/password_form_field.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/component/template/screen_template_view.dart';
+import '../../../screen_template_view.dart';
 import 'login_controller.dart';
 
 class LoginScreen extends StatelessWidget {

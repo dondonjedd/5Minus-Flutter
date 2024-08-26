@@ -3,8 +3,8 @@ import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/utility/dialog_utility.dart';
-import '../../../../go_router.dart';
+import '../../../../../utility/dialog_utility.dart';
+import '../../../../../../go_router.dart';
 import '../../data/auth_repository_data.dart';
 import 'verify_email_screen.dart';
 

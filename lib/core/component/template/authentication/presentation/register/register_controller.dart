@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/utility/dialog_utility.dart';
-import '../../../../core/utility/loading_overlay_utility.dart';
-import '../../../../go_router.dart';
+import '../../../../../utility/dialog_utility.dart';
+import '../../../../../utility/loading_overlay_utility.dart';
+import '../../../../../../go_router.dart';
 import '../../data/auth_repository_data.dart';
 import 'register_screen.dart';
 
