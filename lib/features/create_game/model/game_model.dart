@@ -3,13 +3,15 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GameModel {
+  String hostId;
   String code;
   List<DocumentReference<Map<String, dynamic>>>? players;
   int? gameType;
 
-  GameModel({required this.code, this.players, this.gameType});
+  GameModel({required this.hostId, required this.code, this.players, this.gameType});
 
   factory GameModel.fromMap(Map<String, dynamic> data) => GameModel(
+        hostId: (data['host_id'] as String?) ?? '',
         code: (data['game_code'] as String?) ?? '',
         players: (data['players'] as List<dynamic>?)?.map(
           (e) {
@@ -20,6 +22,7 @@ class GameModel {
       );
 
   Map<String, dynamic> toMap() => {
+        'host_id': hostId,
         'game_code': code,
         'players': players,
         'game_type': gameType,
@@ -42,6 +45,7 @@ class GameModel {
     int? gameType,
   }) {
     return GameModel(
+      hostId: hostId,
       code: code,
       players: players ?? this.players,
       gameType: gameType ?? this.gameType,

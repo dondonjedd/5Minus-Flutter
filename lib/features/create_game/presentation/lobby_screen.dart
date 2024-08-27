@@ -20,6 +20,7 @@ class LobbyScreen extends StatefulWidget {
 class _LobbyScreenState extends State<LobbyScreen> {
   bool isLoading = false;
   GameModel? gameModel;
+  bool isHost = false;
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         });
 
         gameModel = await widget.controller.createGame();
+        if (gameModel?.hostId != null) isHost = widget.controller.isHost(gameModel!.hostId);
         setState(() {
           isLoading = false;
         });
@@ -249,7 +251,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       ],
                     );
                   }),
-
+                  const Padding(padding: EdgeInsets.only(bottom: 24)),
+                  //START OR READY BUTTON
+                  ElevatedButton(
+                    onPressed: (gameModel?.players?.length ?? 0) < 2 ? null : () {},
+                    style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
+                    child: Text(isHost ? 'START' : 'READY'),
+                  ),
                   const SizedBox(
                     height: 200,
                   ),

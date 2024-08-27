@@ -27,6 +27,10 @@ class LobbyController {
     await matchesCollection.doc(gameCode).delete();
   }
 
+  bool isHost(String uid) {
+    return uid == FirebaseAuth.instance.currentUser?.uid;
+  }
+
   Future<GameModel> createGame() async {
     String gameCode = '';
 
@@ -38,9 +42,13 @@ class LobbyController {
       }
     }
 
-    await matchesCollection
-        .doc(gameCode)
-        .set(GameModel(code: gameCode, players: [userCollection.doc(FirebaseAuth.instance.currentUser?.uid ?? '')], gameType: 0).toMap());
+    final hostId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (hostId != null) {
+      await matchesCollection
+          .doc(gameCode)
+          .set(GameModel(hostId: hostId, code: gameCode, players: [userCollection.doc(hostId)], gameType: 0).toMap());
+    }
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
 
