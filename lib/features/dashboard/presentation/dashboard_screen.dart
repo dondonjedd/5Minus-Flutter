@@ -35,15 +35,17 @@ class DashboardScreen extends StatelessWidget {
               ),
               const Padding(padding: EdgeInsets.only(bottom: 24)),
               MenuButton(
-                title: 'Find Game',
+                title: 'Join Game',
                 assetPath: AssetPath.findGame,
                 onTap: () {},
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
               MenuButton(
-                title: 'Play With Friends',
+                title: 'Create Game',
                 assetPath: AssetPath.withFriends,
-                onTap: () {},
+                onTap: () {
+                  controller.navigateCreateGame(context);
+                },
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
               MenuButton(

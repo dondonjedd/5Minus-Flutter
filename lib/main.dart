@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/utility/app_utility.dart';
+import 'features/auth_game_services/model/firebase_user_model.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -50,20 +51,13 @@ void main() async {
         await augDataRepository.signInFirebaseWithPlayGamesServices();
 
         final result3 = await augDataRepository.getUserInfoNetwork();
-        return result3.fold(
-          (failure) {
-            return false;
-          },
+        result3.fold(
+          (failure) {},
           (model) async {
-            final result4 = await augDataRepository.setUserInfoLocal(userInfo: model.toJson());
-            return result4.fold(
-              (l) {
-                return false;
-              },
-              (r) {
-                return true;
-              },
-            );
+            await augDataRepository.setUserInfoLocal(userInfo: model.toJson());
+            if (model.username == null || model.id == null) return;
+            await augDataRepository
+                .createFirebaseUser(FirebaseUserModel(icon: model.icon, points: model.points, username: model.username!, playerId: model.id!));
           },
         );
       }

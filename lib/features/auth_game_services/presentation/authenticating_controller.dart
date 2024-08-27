@@ -1,4 +1,5 @@
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
+import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/go_router.dart';
 import 'package:flutter/material.dart';
 import 'authenticating_screen.dart';
@@ -40,15 +41,35 @@ class AuthenticatingController {
                   return false;
                 },
                 (model) async {
+                  bool res = false;
                   final result4 = await _augDataRepository.setUserInfoLocal(userInfo: model.toJson());
-                  return result4.fold(
+                  result4.fold(
                     (l) {
-                      return false;
+                      res = false;
                     },
                     (r) {
-                      return true;
+                      res = true;
                     },
                   );
+
+                  if (model.username == null || model.id == null) return false;
+
+                  final result5 = await _augDataRepository.createFirebaseUser(FirebaseUserModel(
+                    playerId: model.id!,
+                    username: model.username!,
+                    icon: model.icon,
+                    points: model.points,
+                  ));
+                  result5.fold(
+                    (l) {
+                      res = false;
+                    },
+                    (r) {
+                      res = true;
+                    },
+                  );
+
+                  return res;
                 },
               );
             }

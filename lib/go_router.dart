@@ -1,5 +1,6 @@
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/auth_game_services/presentation/authenticating_controller.dart';
+import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:five_minus/features/leaderboard/presentation/leaderboard_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
@@ -101,6 +102,27 @@ class RouterInstance {
               },
             ),
           ],
+        ),
+        GoRoute(
+          path: '/createGameController',
+          name: LobbyController.routeName,
+          builder: (context, state) {
+            return LobbyController.screen();
+          },
+          redirect: (context, state) {
+            final res = _augDataRepository.getUserInfoLocal();
+            return res.fold(
+              (failure) {
+                return null;
+              },
+              (userModel) {
+                if (userModel.isEmpty) {
+                  return '/authenticatingController';
+                }
+                return null;
+              },
+            );
+          },
         ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
-import 'package:five_minus/model/pgs_user_model.dart';
+import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
+import 'package:five_minus/features/auth_game_services/model/pgs_user_model.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utility/typedefs.dart';
@@ -30,6 +31,15 @@ class AugDataRepository {
   ResultVoid signInFirebaseWithPlayGamesServices() async {
     try {
       await _networkDatasource.signInFirebaseWithPlayGamesServices();
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
+  ResultVoid createFirebaseUser(FirebaseUserModel model) async {
+    try {
+      await _networkDatasource.createFirebaseUser(model);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));

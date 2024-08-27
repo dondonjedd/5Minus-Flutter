@@ -1,7 +1,8 @@
 import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
+import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
-import 'package:five_minus/model/pgs_user_model.dart';
+import 'package:five_minus/features/auth_game_services/model/pgs_user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:games_services/games_services.dart';
 import 'package:go_router/go_router.dart';
@@ -17,8 +18,8 @@ class DashboardController {
 
   final AugDataRepository _augDataRepository = AugDataRepository();
 
-  navigateSettings(BuildContext context) {
-    context.goNamed(SettingsController.routeName);
+  navigateCreateGame(BuildContext context) {
+    context.goNamed(LobbyController.routeName);
   }
 
   bool _isLeaderboardShowng = false;
@@ -30,6 +31,10 @@ class DashboardController {
     await GamesServices.showLeaderboards();
     await Future.delayed(const Duration(seconds: 1));
     _isLeaderboardShowng = false;
+  }
+
+  navigateSettings(BuildContext context) {
+    context.goNamed(SettingsController.routeName);
   }
 
   PgsUserModel? getUserDetails() {
