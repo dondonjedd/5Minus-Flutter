@@ -19,5 +19,9 @@ class ConfigurationData {
 
   static const int pageSize = 20;
 
+  static const String clientId = '74700725365-h4f88e2mv14d5agpliaf6o5rfp3h5224.apps.googleusercontent.com';
+
+  static const String androidLeaderboardId = 'CgkI9biKpJYCEAIQAQ';
+
   const ConfigurationData._();
 }

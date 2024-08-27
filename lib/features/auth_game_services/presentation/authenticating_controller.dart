@@ -32,6 +32,8 @@ class AuthenticatingController {
               _augDataRepository.setUserInfoLocal(userInfo: '');
               return false;
             } else {
+              await _augDataRepository.signInFirebaseWithPlayGamesServices();
+
               final result3 = await _augDataRepository.getUserInfoNetwork();
               return result3.fold(
                 (failure) {

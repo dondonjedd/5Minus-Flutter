@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:games_services/games_services.dart';
 
 import '../../../core/component/template/screen_template_view.dart';
+import '../../../core/data/configuration_data.dart';
 import 'leaderboard_controller.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -31,7 +32,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         });
 
         leaderboardList = await GamesServices.loadLeaderboardScores(
-              androidLeaderboardID: 'CgkI9biKpJYCEAIQAQ',
+              androidLeaderboardID: ConfigurationData.androidLeaderboardId,
               maxResults: 30,
               scope: PlayerScope.global,
               timeScope: TimeScope.allTime,
@@ -100,7 +101,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                 }
                               });
                               leaderboardList = await GamesServices.loadLeaderboardScores(
-                                    androidLeaderboardID: 'CgkI9biKpJYCEAIQAQ',
+                                    androidLeaderboardID: ConfigurationData.androidLeaderboardId,
                                     maxResults: 30,
                                     scope: PlayerScope.global,
                                     timeScope: index == 0 ? TimeScope.allTime : TimeScope.week,

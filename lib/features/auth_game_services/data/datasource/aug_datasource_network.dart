@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/core/data/configuration_data.dart';
 import 'package:flutter/material.dart';
 import 'package:games_services/games_services.dart';
 
@@ -9,6 +11,17 @@ class AugNetworkDatasource {
   Future<void> signInPlayGamesServices() async {
     try {
       await GamesServices.signIn();
+    } catch (e) {
+      throw ServerException(title: 'Sign In Error', message: e.toString(), statusCode: '999');
+    }
+  }
+
+  Future<void> signInFirebaseWithPlayGamesServices() async {
+    try {
+      final authCode = await GamesServices.getAuthCode(ConfigurationData.clientId);
+      if (authCode?.isNotEmpty ?? false) FirebaseAuth.instance.signInWithCredential(PlayGamesAuthProvider.credential(serverAuthCode: authCode!));
+    } on FirebaseAuthException catch (e) {
+      throw ServerException(title: e.code, message: e.message ?? 'Sign In Error', statusCode: '999', type: '2');
     } catch (e) {
       throw ServerException(title: 'Sign In Error', message: e.toString(), statusCode: '999');
     }
@@ -43,10 +56,10 @@ class AugNetworkDatasource {
 
   Future<int> getPlayerScore() async {
     try {
-      final res = await GamesServices.getPlayerScore(androidLeaderboardID: 'CgkI9biKpJYCEAIQAQ');
+      final res = await GamesServices.getPlayerScore(androidLeaderboardID: ConfigurationData.androidLeaderboardId);
       return res ?? 0;
     } catch (e) {
-      throw ServerException(title: 'Get player info error', message: e.toString(), statusCode: '999');
+      return 0;
     }
   }
 

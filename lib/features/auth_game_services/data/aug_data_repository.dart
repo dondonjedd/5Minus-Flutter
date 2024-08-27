@@ -27,6 +27,15 @@ class AugDataRepository {
     }
   }
 
+  ResultVoid signInFirebaseWithPlayGamesServices() async {
+    try {
+      await _networkDatasource.signInFirebaseWithPlayGamesServices();
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
   ResultFutureServer<bool> getIsUserSignedInNetwork() async {
     try {
       final result = await _networkDatasource.getIsUserSignedIn();

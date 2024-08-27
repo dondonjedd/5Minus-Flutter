@@ -44,6 +44,8 @@ void main() async {
       if (!isSuccess) {
         await augDataRepository.setUserInfoLocal(userInfo: '');
       } else {
+        await augDataRepository.signInFirebaseWithPlayGamesServices();
+
         final result3 = await augDataRepository.getUserInfoNetwork();
         return result3.fold(
           (failure) {
