@@ -1,3 +1,4 @@
+import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:five_minus/model/pgs_user_model.dart';
@@ -20,9 +21,15 @@ class DashboardController {
     context.goNamed(SettingsController.routeName);
   }
 
-  navigateLeaderboard(BuildContext context) {
+  bool _isLeaderboardShowng = false;
+  navigateLeaderboard(BuildContext context) async {
     // context.goNamed(LeaderboardController.routeName);
-    GamesServices.showLeaderboards();
+
+    if (_isLeaderboardShowng == true) return;
+    _isLeaderboardShowng = true;
+    await GamesServices.showLeaderboards();
+    await Future.delayed(const Duration(seconds: 1));
+    _isLeaderboardShowng = false;
   }
 
   PgsUserModel? getUserDetails() {
