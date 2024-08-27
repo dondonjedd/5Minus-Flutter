@@ -21,7 +21,9 @@ class AugNetworkDatasource {
   Future<FirebaseUserModel?> signInFirebaseWithPlayGamesServices() async {
     try {
       final authCode = await GamesServices.getAuthCode(ConfigurationData.clientId);
-      if (authCode?.isNotEmpty ?? false) FirebaseAuth.instance.signInWithCredential(PlayGamesAuthProvider.credential(serverAuthCode: authCode!));
+      if (authCode?.isNotEmpty ?? false) {
+        await FirebaseAuth.instance.signInWithCredential(PlayGamesAuthProvider.credential(serverAuthCode: authCode!));
+      }
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Sign In Error', statusCode: '999', type: '2');
     } catch (e) {
