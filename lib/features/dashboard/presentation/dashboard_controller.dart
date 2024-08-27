@@ -1,6 +1,8 @@
 import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
+import 'package:five_minus/features/create_game/model/lobby_params.dart';
 import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
+import 'package:five_minus/features/join_game/presentation/join_game_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:five_minus/features/auth_game_services/model/pgs_user_model.dart';
 import 'package:flutter/material.dart';
@@ -18,8 +20,12 @@ class DashboardController {
 
   final AugDataRepository _augDataRepository = AugDataRepository();
 
+  navigateJoinGame(BuildContext context) {
+    context.goNamed(JoinGameController.routeName);
+  }
+
   navigateCreateGame(BuildContext context) {
-    context.goNamed(LobbyController.routeName);
+    context.goNamed(LobbyController.routeName, extra: LobbyParams(isCreateGame: true));
   }
 
   bool _isLeaderboardShowng = false;

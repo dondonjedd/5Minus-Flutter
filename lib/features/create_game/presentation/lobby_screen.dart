@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/create_game/model/game_model.dart';
+import 'package:five_minus/features/create_game/model/lobby_params.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/component/template/screen_template_view.dart';
@@ -11,7 +12,8 @@ import 'lobby_controller.dart';
 
 class LobbyScreen extends StatefulWidget {
   final LobbyController controller;
-  const LobbyScreen({super.key, required this.controller});
+  final LobbyParams lobbyParams;
+  const LobbyScreen({super.key, required this.controller, required this.lobbyParams});
 
   @override
   State<LobbyScreen> createState() => _LobbyScreenState();
@@ -29,9 +31,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
         setState(() {
           isLoading = true;
         });
-
-        gameModel = await widget.controller.createGame();
-        if (gameModel?.hostId != null) isHost = widget.controller.isHost(gameModel!.hostId);
+        if (widget.lobbyParams.isCreateGame) {
+          gameModel = await widget.controller.createGame();
+          if (gameModel?.hostId != null) isHost = widget.controller.isHost(gameModel!.hostId);
+        } else {
+          gameModel = await widget.controller.joinGame(widget.lobbyParams.gameCode ?? '');
+        }
+        if (gameModel?.code != null) {
+          FirebaseFirestore.instance.collection('matches').doc(gameModel?.code).snapshots().listen(
+            (event) {
+              _updateLocalFromFirestore(event);
+            },
+          );
+        }
         setState(() {
           isLoading = false;
         });
@@ -39,6 +51,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
     );
 
     super.initState();
+  }
+
+  void _updateLocalFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) {
+    setState(() {
+      if (event.data() != null) {
+        gameModel = GameModel.fromMap(event.data()!);
+        if (gameModel?.gameType != null) {
+          for (int i = 0; i < _selectedGameType.length; i++) {
+            _selectedGameType[i] = i == gameModel!.gameType;
+          }
+        }
+      }
+    });
   }
 
   List<bool> _selectedGameType = <bool>[

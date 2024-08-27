@@ -37,7 +37,9 @@ class DashboardScreen extends StatelessWidget {
               MenuButton(
                 title: 'Join Game',
                 assetPath: AssetPath.findGame,
-                onTap: () {},
+                onTap: () {
+                  controller.navigateJoinGame(context);
+                },
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
               MenuButton(

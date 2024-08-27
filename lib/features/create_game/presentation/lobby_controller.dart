@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:five_minus/features/create_game/model/game_model.dart';
+import 'package:five_minus/features/create_game/model/lobby_params.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -12,8 +12,11 @@ import 'lobby_screen.dart';
 
 class LobbyController {
   static const String routeName = '/LobbyController';
-  static Widget screen() {
-    return LobbyScreen(controller: LobbyController._());
+  static Widget screen({required LobbyParams params}) {
+    return LobbyScreen(
+      controller: LobbyController._(),
+      lobbyParams: params,
+    );
   }
 
   LobbyController._();
@@ -31,6 +34,7 @@ class LobbyController {
     return uid == FirebaseAuth.instance.currentUser?.uid;
   }
 
+  //CREATE GAME
   Future<GameModel> createGame() async {
     String gameCode = '';
 
@@ -65,6 +69,19 @@ class LobbyController {
     } else {
       return true;
     }
+  }
+
+  //JOIN GAME
+  Future<GameModel> joinGame(String gameCode) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (userId != null) {
+      await matchesCollection.doc(gameCode).set({
+        'players': FieldValue.arrayUnion([userCollection.doc(userId)])
+      }, SetOptions(merge: true));
+    }
+
+    return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
 
   navigateDashboard(BuildContext context) {

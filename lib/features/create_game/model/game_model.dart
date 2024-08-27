@@ -1,14 +1,15 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:equatable/equatable.dart';
 
-class GameModel {
-  String hostId;
-  String code;
-  List<DocumentReference<Map<String, dynamic>>>? players;
-  int? gameType;
+class GameModel extends Equatable {
+  final String hostId;
+  final String code;
+  final List<DocumentReference<Map<String, dynamic>>>? players;
+  final int? gameType;
 
-  GameModel({required this.hostId, required this.code, this.players, this.gameType});
+  const GameModel({required this.hostId, required this.code, this.players, this.gameType});
 
   factory GameModel.fromMap(Map<String, dynamic> data) => GameModel(
         hostId: (data['host_id'] as String?) ?? '',
@@ -51,4 +52,8 @@ class GameModel {
       gameType: gameType ?? this.gameType,
     );
   }
+
+  @override
+  // TODO: implement props
+  List<Object?> get props => [code];
 }

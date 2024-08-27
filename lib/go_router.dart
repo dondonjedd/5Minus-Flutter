@@ -1,7 +1,9 @@
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/auth_game_services/presentation/authenticating_controller.dart';
+import 'package:five_minus/features/create_game/model/lobby_params.dart';
 import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
+import 'package:five_minus/features/join_game/presentation/join_game_controller.dart';
 import 'package:five_minus/features/leaderboard/presentation/leaderboard_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:flutter/material.dart';
@@ -89,6 +91,13 @@ class RouterInstance {
           routes: [
             GoRoute(
               path: 'leaderboardController',
+              name: JoinGameController.routeName,
+              builder: (context, state) {
+                return JoinGameController.screen();
+              },
+            ),
+            GoRoute(
+              path: 'leaderboardController',
               name: LeaderboardController.routeName,
               builder: (context, state) {
                 return LeaderboardController.screen();
@@ -107,7 +116,7 @@ class RouterInstance {
           path: '/createGameController',
           name: LobbyController.routeName,
           builder: (context, state) {
-            return LobbyController.screen();
+            return LobbyController.screen(params: state.extra as LobbyParams);
           },
           redirect: (context, state) {
             final res = _augDataRepository.getUserInfoLocal();
