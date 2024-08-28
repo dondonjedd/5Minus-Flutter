@@ -54,7 +54,7 @@ class JoinGameScreen extends StatelessWidget {
                 ),
                 validator: (value) {
                   if (value?.length != 4) {
-                    return 'Game code must have 4 characters';
+                    return 'Invalid code';
                   }
                   return null;
                 },
