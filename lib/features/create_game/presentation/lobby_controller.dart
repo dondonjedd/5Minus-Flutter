@@ -148,8 +148,14 @@ class LobbyController {
     if (gameCode.length != 4) return;
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    int playerIndex = getPlayerIndex(playerModelList: playerModelList);
-    playerModelList[playerIndex].isReady = !(playerModelList[playerIndex].isReady ?? true);
+    playerModelList = playerModelList.map(
+      (e) {
+        if (e.player?.id == userId) {
+          e.isReady = !(e.isReady ?? true);
+        }
+        return e;
+      },
+    ).toList();
     if (userId != null) {
       await matchesCollection.doc(gameCode).update({
         'players': playerModelList.map(
@@ -164,20 +170,13 @@ class LobbyController {
   bool isPlayerReady({required List<PlayerMatchModel>? playerModelList}) {
     if (playerModelList == null) return false;
 
-    int playerIndex = getPlayerIndex(playerModelList: playerModelList);
-    if (playerIndex == -1) return false;
-    return playerModelList[playerIndex].isReady ?? false;
-  }
-
-  int getPlayerIndex({required List<PlayerMatchModel> playerModelList}) {
     final userId = FirebaseAuth.instance.currentUser?.uid;
-
-    return playerModelList.indexWhere(
-      (element) {
-        return element.player?.id == userId;
-      },
-    );
+    return playerModelList.firstWhere((element) => element.player?.id == userId, orElse: () {
+          return PlayerMatchModel(player: null, isReady: false);
+        }).isReady ??
+        false;
   }
+
   //*******************CLIENT********************
 
   navigateDashboard(BuildContext context) {
