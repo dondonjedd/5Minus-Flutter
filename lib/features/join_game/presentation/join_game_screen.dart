@@ -1,10 +1,5 @@
-import 'package:five_minus/core/component/template/app_template_view.dart';
-import 'package:five_minus/features/create_game/model/lobby_params.dart';
-import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../core/component/template/screen_template_view.dart';
 import 'join_game_controller.dart';
 
@@ -12,7 +7,7 @@ class JoinGameScreen extends StatelessWidget {
   final JoinGameController controller;
   JoinGameScreen({super.key, required this.controller});
   final TextEditingController gameCodeTextEditController = TextEditingController();
-  GlobalKey<FormFieldState> gameCodeFormKey = GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> gameCodeFormKey = GlobalKey<FormFieldState>();
   @override
   Widget build(BuildContext context) {
     return ScreenTemplateView(
@@ -70,7 +65,7 @@ class JoinGameScreen extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 if (!(gameCodeFormKey.currentState?.validate() ?? false)) return;
-                context.goNamed(LobbyController.routeName, extra: LobbyParams(isCreateGame: false, gameCode: gameCodeTextEditController.text));
+                controller.joinGame(context, gameCodeTextEditController.text);
               },
               style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
               child: const Text('Join Private Game'),

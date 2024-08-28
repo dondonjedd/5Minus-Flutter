@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/create_game/model/game_model.dart';
 import 'package:five_minus/features/create_game/model/lobby_params.dart';
