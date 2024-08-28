@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,18 +21,20 @@ class LobbyController {
   }
 
   LobbyController._();
+  bool isHost(String uid) {
+    return uid == FirebaseAuth.instance.currentUser?.uid;
+  }
+
+  //*******************HOST********************
   String characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
   final matchesCollection = FirebaseFirestore.instance.collection('matches');
   final userCollection = FirebaseFirestore.instance.collection('users');
 
-  deleteGame(String gameCode) async {
-    if (gameCode.isEmpty) return;
+  //DELETE GAME
+  deleteGame({required String gameCode, required bool isHost}) async {
+    if (gameCode.isEmpty || !isHost) return;
     await matchesCollection.doc(gameCode).delete();
-  }
-
-  bool isHost(String uid) {
-    return uid == FirebaseAuth.instance.currentUser?.uid;
   }
 
   //CREATE GAME
@@ -56,11 +59,13 @@ class LobbyController {
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
 
+  //GENERATE GAME CODE
   String generateGameCode() {
     Random random = Random();
     return String.fromCharCodes(Iterable.generate(4, (_) => characters.codeUnitAt(random.nextInt(characters.length))));
   }
 
+  //VERIFY IF GAME CODE IS AVAILABLE
   Future<bool> isGameCodeAvailable(String gameCode) async {
     final res = await matchesCollection.doc(gameCode).get();
 
@@ -70,6 +75,34 @@ class LobbyController {
       return true;
     }
   }
+
+  //TOGGLE GAME TYPE
+  List<bool> toggleGameTypeLocal({required int? index, required List<bool> selectedGameType}) {
+    List<bool> tmpList = [...selectedGameType];
+    for (int i = 0; i < tmpList.length; i++) {
+      tmpList[i] = i == index;
+    }
+    return tmpList;
+  }
+
+  //TOGGLE GAME TYPE IN FIRESTORE
+  Future<void> toggleGameTypeFstore({required String? gameCode, required int gameType}) async {
+    if (gameCode == null) return;
+
+    await FirebaseFirestore.instance.collection('matches').doc(gameCode).update({'game_type': gameType});
+    return;
+  }
+
+  StreamSubscription? listenToChanges(GameModel? gameModel, void Function(DocumentSnapshot<Map<String, dynamic>>)? onData) {
+    if (gameModel?.code != null) {
+      return FirebaseFirestore.instance.collection('matches').doc(gameModel?.code).snapshots().listen(onData);
+    }
+    return null;
+  }
+
+  //*******************HOST********************
+
+  //*******************CLIENT********************
 
   //JOIN GAME
   Future<GameModel> joinGame(String gameCode) async {
@@ -83,6 +116,7 @@ class LobbyController {
 
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
+  //*******************CLIENT********************
 
   navigateDashboard(BuildContext context) {
     context.goNamed(DashboardController.routeName);

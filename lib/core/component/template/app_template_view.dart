@@ -111,6 +111,15 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
             return null;
           },
         ))),
+        toggleButtonsTheme: ToggleButtonsThemeData(
+          disabledColor: Colors.grey[350],
+          disabledBorderColor: Colors.grey[350],
+          selectedBorderColor: Colors.white,
+          borderColor: Colors.white,
+          selectedColor: Colors.black,
+          fillColor: Colors.white,
+          color: Colors.white,
+        ),
         colorScheme: ColorScheme.light(
           brightness: Brightness.light,
           primary: ColorVariableData.light.primary,

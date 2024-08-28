@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -24,6 +25,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
   GameModel? gameModel;
   bool isHost = false;
 
+  StreamSubscription? _gameStreamSubscription;
+  @override
+  void dispose() {
+    _gameStreamSubscription?.cancel();
+    super.dispose();
+  }
+
   @override
   void initState() {
     WidgetsBinding.instance.addPostFrameCallback(
@@ -31,19 +39,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
         setState(() {
           isLoading = true;
         });
+        //INITIALIZE HOST
         if (widget.lobbyParams.isCreateGame) {
           gameModel = await widget.controller.createGame();
           if (gameModel?.hostId != null) isHost = widget.controller.isHost(gameModel!.hostId);
-        } else {
+        }
+        //INITIALIZE CLIENT
+        else {
           gameModel = await widget.controller.joinGame(widget.lobbyParams.gameCode ?? '');
         }
-        if (gameModel?.code != null) {
-          FirebaseFirestore.instance.collection('matches').doc(gameModel?.code).snapshots().listen(
-            (event) {
-              _updateLocalFromFirestore(event);
-            },
-          );
-        }
+
+        //LISTEN CHANGES
+        _gameStreamSubscription = widget.controller.listenToChanges(gameModel, _updateLocalFromFirestore);
+
         setState(() {
           isLoading = false;
         });
@@ -58,15 +66,22 @@ class _LobbyScreenState extends State<LobbyScreen> {
       if (event.data() != null) {
         gameModel = GameModel.fromMap(event.data()!);
         if (gameModel?.gameType != null) {
-          for (int i = 0; i < _selectedGameType.length; i++) {
-            _selectedGameType[i] = i == gameModel!.gameType;
+          for (int i = 0; i < selectedGameType.length; i++) {
+            selectedGameType[i] = i == gameModel!.gameType;
           }
         }
       }
     });
   }
 
-  List<bool> _selectedGameType = <bool>[
+  bool canStart() {
+    const res = false;
+    if ((gameModel?.players?.length ?? 0) < 2) return false;
+    if (!isHost) return false;
+    return res;
+  }
+
+  List<bool> selectedGameType = <bool>[
     true,
     false,
   ];
@@ -84,7 +99,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               iconSize: 35,
               onPressed: () async {
                 LoadingOverlay().show(context);
-                widget.controller.deleteGame(gameModel?.code ?? '');
+                widget.controller.deleteGame(gameCode: gameModel?.code ?? '', isHost: isHost);
                 LoadingOverlay().hide();
                 widget.controller.navigateDashboard(context);
               },
@@ -132,6 +147,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                               base64Decode(userModel.icon ?? ''),
                                               width: 60,
                                               height: 60,
+                                              gaplessPlayback: true,
                                             )),
                                             Text(userModel.username),
                                           ],
@@ -201,42 +217,31 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   StatefulBuilder(builder: (context, setStateFn) {
                     return ToggleButtons(
                       direction: Axis.horizontal,
-                      onPressed: (int index) async {
-                        List<bool> tmpList = [..._selectedGameType];
-                        for (int i = 0; i < tmpList.length; i++) {
-                          tmpList[i] = i == index;
-                        }
-                        setStateFn(() {
-                          isToggleButtonLoading = true;
-                        });
+                      onPressed: !isHost
+                          ? null
+                          : (int index) async {
+                              selectedGameType = widget.controller.toggleGameTypeLocal(index: index, selectedGameType: selectedGameType);
 
-                        _selectedGameType = tmpList;
-                        if (gameModel?.code != null) {
-                          await FirebaseFirestore.instance
-                              .collection('matches')
-                              .doc(gameModel!.code)
-                              .set(gameModel!.copyWith(gameType: index).toMap());
-                        }
+                              setStateFn(() {
+                                isToggleButtonLoading = true;
+                              });
 
-                        setStateFn(() {
-                          isToggleButtonLoading = false;
-                        });
-                      },
+                              await widget.controller.toggleGameTypeFstore(gameCode: gameModel?.code, gameType: index);
+
+                              setStateFn(() {
+                                isToggleButtonLoading = false;
+                              });
+                            },
                       constraints: const BoxConstraints(minHeight: 40),
                       borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      selectedBorderColor: Colors.white,
-                      borderColor: Colors.white,
-                      selectedColor: Colors.black,
-                      fillColor: Colors.white,
-                      color: Colors.white,
-                      isSelected: _selectedGameType,
+                      isSelected: selectedGameType,
                       children: [
                         SizedBox(
                           width: 120,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (_selectedGameType[0])
+                              if (selectedGameType[0])
                                 Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: isToggleButtonLoading
@@ -257,7 +262,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (_selectedGameType[1])
+                              if (selectedGameType[1])
                                 Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: isToggleButtonLoading
@@ -279,7 +284,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   const Padding(padding: EdgeInsets.only(bottom: 24)),
                   //START OR READY BUTTON
                   ElevatedButton(
-                    onPressed: (gameModel?.players?.length ?? 0) < 2 ? null : () {},
+                    onPressed: isHost
+                        ? canStart()
+                            ? () {}
+                            : null
+                        : () {},
                     style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
                     child: Text(isHost ? 'START' : 'READY'),
                   ),
