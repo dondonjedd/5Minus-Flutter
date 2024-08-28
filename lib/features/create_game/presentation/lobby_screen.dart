@@ -70,6 +70,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
             selectedGameType[i] = i == gameModel!.gameType;
           }
         }
+      } else {
+        widget.controller.navigateDashboard(context);
       }
     });
   }
