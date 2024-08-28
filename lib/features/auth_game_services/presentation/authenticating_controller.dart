@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/go_router.dart';
@@ -55,7 +56,7 @@ class AuthenticatingController {
                   if (model.username == null || model.id == null) return false;
 
                   final result5 = await _augDataRepository.createFirebaseUser(FirebaseUserModel(
-                    playerId: model.id!,
+                    playerId: FirebaseAuth.instance.currentUser?.uid,
                     username: model.username!,
                     icon: model.icon,
                     points: model.points,

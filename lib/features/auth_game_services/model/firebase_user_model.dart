@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 class FirebaseUserModel {
-  String playerId;
+  String? playerId;
   String username;
   int? wins = 0;
   int? loss = 0;
@@ -9,7 +9,7 @@ class FirebaseUserModel {
   String? icon;
 
   FirebaseUserModel({
-    required this.playerId,
+    this.playerId,
     required this.username,
     this.wins = 0,
     this.loss = 0,

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/create_game/model/game_model.dart';
 import 'package:five_minus/features/create_game/model/lobby_params.dart';
+import 'package:five_minus/features/create_game/model/player_match_model.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -21,8 +22,10 @@ class LobbyController {
   }
 
   LobbyController._();
-  bool isHost(String uid) {
-    return uid == FirebaseAuth.instance.currentUser?.uid;
+  bool isHost({required String? hostId, String? uid}) {
+    if (hostId == null) return false;
+    if (hostId.isEmpty) return false;
+    return hostId == (uid ?? FirebaseAuth.instance.currentUser?.uid);
   }
 
   //*******************HOST********************
@@ -53,9 +56,9 @@ class LobbyController {
     final hostId = FirebaseAuth.instance.currentUser?.uid;
 
     if (hostId != null) {
-      await matchesCollection
-          .doc(gameCode)
-          .set(GameModel(hostId: hostId, code: gameCode, players: [userCollection.doc(hostId)], gameType: 0).toMap());
+      await matchesCollection.doc(gameCode).set(
+          GameModel(hostId: hostId, code: gameCode, players: [PlayerMatchModel(player: userCollection.doc(hostId), isReady: true)], gameType: 0)
+              .toMap());
     }
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
@@ -111,7 +114,7 @@ class LobbyController {
 
     if (userId != null) {
       await matchesCollection.doc(gameCode).set({
-        'players': FieldValue.arrayUnion([userCollection.doc(userId)])
+        'players': FieldValue.arrayUnion([PlayerMatchModel(player: userCollection.doc(userId)).toMap()])
       }, SetOptions(merge: true));
     }
 
@@ -119,16 +122,61 @@ class LobbyController {
   }
 
   //LEAVE GAME
-  Future<void> leaveGame(String? gameCode) async {
-    if (gameCode == null) return;
+  Future<void> leaveGame({required String? gameCode, required List<PlayerMatchModel>? playerModelList}) async {
+    if (gameCode == null || playerModelList == null) return;
     if (gameCode.length != 4) return;
     final userId = FirebaseAuth.instance.currentUser?.uid;
-
+    playerModelList.removeWhere(
+      (element) {
+        return element.player?.id == userId;
+      },
+    );
     if (userId != null) {
       await matchesCollection.doc(gameCode).set({
-        'players': FieldValue.arrayRemove([userCollection.doc(userId)])
+        'players': playerModelList.map(
+          (e) {
+            return e.toMap();
+          },
+        ).toList()
       }, SetOptions(merge: true));
     }
+  }
+
+  //TOGGLE READY OR UNREADY
+  Future<void> toggleReady({required String? gameCode, required List<PlayerMatchModel>? playerModelList}) async {
+    if (gameCode == null || playerModelList == null) return;
+    if (gameCode.length != 4) return;
+
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    int playerIndex = getPlayerIndex(playerModelList: playerModelList);
+    playerModelList[playerIndex].isReady = !(playerModelList[playerIndex].isReady ?? true);
+    if (userId != null) {
+      await matchesCollection.doc(gameCode).update({
+        'players': playerModelList.map(
+          (e) {
+            return e.toMap();
+          },
+        ).toList()
+      });
+    }
+  }
+
+  bool isPlayerReady({required List<PlayerMatchModel>? playerModelList}) {
+    if (playerModelList == null) return false;
+
+    int playerIndex = getPlayerIndex(playerModelList: playerModelList);
+    if (playerIndex == -1) return false;
+    return playerModelList[playerIndex].isReady ?? false;
+  }
+
+  int getPlayerIndex({required List<PlayerMatchModel> playerModelList}) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    return playerModelList.indexWhere(
+      (element) {
+        return element.player?.id == userId;
+      },
+    );
   }
   //*******************CLIENT********************
 

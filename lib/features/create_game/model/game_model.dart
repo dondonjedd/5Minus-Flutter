@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
+import 'package:five_minus/features/create_game/model/player_match_model.dart';
 
 class GameModel extends Equatable {
   final String hostId;
   final String code;
-  final List<DocumentReference<Map<String, dynamic>>>? players;
+  final List<PlayerMatchModel>? players;
   final int? gameType;
 
   const GameModel({required this.hostId, required this.code, this.players, this.gameType});
@@ -16,7 +16,7 @@ class GameModel extends Equatable {
         code: (data['game_code'] as String?) ?? '',
         players: (data['players'] as List<dynamic>?)?.map(
           (e) {
-            return e as DocumentReference<Map<String, dynamic>>;
+            return PlayerMatchModel.fromMap(e);
           },
         ).toList(),
         gameType: data['game_type'] as int?,
@@ -25,7 +25,11 @@ class GameModel extends Equatable {
   Map<String, dynamic> toMap() => {
         'host_id': hostId,
         'game_code': code,
-        'players': players,
+        'players': players?.map(
+          (e) {
+            return e.toMap();
+          },
+        ).toList(),
         'game_type': gameType,
       };
 
@@ -42,7 +46,7 @@ class GameModel extends Equatable {
   String toJson() => json.encode(toMap());
 
   GameModel copyWith({
-    List<DocumentReference<Map<String, dynamic>>>? players,
+    List<PlayerMatchModel>? players,
     int? gameType,
   }) {
     return GameModel(

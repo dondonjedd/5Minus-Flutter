@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:five_minus/core/component/template/app_template_view.dart';
 import 'package:five_minus/core/utility/key_value_utility.dart';
@@ -56,8 +57,8 @@ void main() async {
           (model) async {
             await augDataRepository.setUserInfoLocal(userInfo: model.toJson());
             if (model.username == null || model.id == null) return;
-            await augDataRepository
-                .createFirebaseUser(FirebaseUserModel(icon: model.icon, points: model.points, username: model.username!, playerId: model.id!));
+            await augDataRepository.createFirebaseUser(FirebaseUserModel(
+                icon: model.icon, points: model.points, username: model.username!, playerId: FirebaseAuth.instance.currentUser?.uid));
           },
         );
       }

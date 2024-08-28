@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/create_game/model/game_model.dart';
 import 'package:five_minus/features/create_game/model/lobby_params.dart';
@@ -24,7 +25,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
   bool isLoading = false;
   GameModel? gameModel;
   bool isHost = false;
-
   StreamSubscription? _gameStreamSubscription;
   @override
   void dispose() {
@@ -42,12 +42,14 @@ class _LobbyScreenState extends State<LobbyScreen> {
         //INITIALIZE HOST
         if (widget.lobbyParams.isCreateGame) {
           gameModel = await widget.controller.createGame();
-          if (gameModel?.hostId != null) isHost = widget.controller.isHost(gameModel!.hostId);
         }
         //INITIALIZE CLIENT
         else {
           gameModel = await widget.controller.joinGame(widget.lobbyParams.gameCode ?? '');
         }
+
+        //INITIALIZE ISHOST
+        if (gameModel?.hostId != null) isHost = widget.controller.isHost(hostId: gameModel!.hostId);
 
         //LISTEN CHANGES
         _gameStreamSubscription = widget.controller.listenToChanges(gameModel, _updateLocalFromFirestore);
@@ -77,10 +79,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   bool canStart() {
-    const res = false;
     if ((gameModel?.players?.length ?? 0) < 2) return false;
     if (!isHost) return false;
-    return res;
+    if (gameModel?.players?.any(
+          (element) {
+            return !(element.isReady ?? false);
+          },
+        ) ??
+        true) return false;
+
+    return true;
   }
 
   List<bool> selectedGameType = <bool>[
@@ -92,6 +100,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   @override
   Widget build(BuildContext context) {
     return ScreenTemplateView(
+      //Close Button
       suffixActionList: [
         Padding(
           padding: const EdgeInsets.only(
@@ -104,7 +113,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 if (isHost) {
                   await widget.controller.deleteGame(gameCode: gameModel?.code);
                 } else {
-                  await widget.controller.leaveGame(gameModel?.code);
+                  await widget.controller.leaveGame(gameCode: gameModel?.code, playerModelList: gameModel?.players);
                 }
                 LoadingOverlay().hide();
                 widget.controller.navigateDashboard(context);
@@ -139,23 +148,55 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     child: Row(
                       children: [
                         ...gameModel?.players?.map(
-                              (e) {
+                              (model) {
                                 return FutureBuilder(
-                                  future: e.get(),
+                                  future: model.player?.get(),
                                   builder: (context, snapshot) {
                                     if (snapshot.hasData) {
                                       final userModel = FirebaseUserModel.fromMap(snapshot.data?.data() ?? {});
                                       return Expanded(
                                         child: Column(
                                           children: [
-                                            ClipOval(
-                                                child: Image.memory(
-                                              base64Decode(userModel.icon ?? ''),
-                                              width: 60,
-                                              height: 60,
-                                              gaplessPlayback: true,
-                                            )),
-                                            Text(userModel.username),
+                                            Stack(
+                                              children: [
+                                                ClipOval(
+                                                    child: Image.memory(
+                                                  base64Decode(userModel.icon ?? ''),
+                                                  width: 60,
+                                                  height: 60,
+                                                  gaplessPlayback: true,
+                                                )),
+                                                Positioned(
+                                                  top: 3,
+                                                  right: 3,
+                                                  child: Container(
+                                                    width: 14,
+                                                    height: 14,
+                                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                                  ),
+                                                ),
+                                                Positioned(
+                                                  top: 0,
+                                                  right: 0,
+                                                  child: Icon(
+                                                    (model.isReady ?? false) ? Icons.check_circle : Icons.cancel,
+                                                    color: (model.isReady ?? false) ? Colors.green : Colors.red,
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                if (widget.controller.isHost(hostId: gameModel?.hostId ?? '', uid: userModel.playerId ?? ''))
+                                                  const Icon(
+                                                    Icons.person,
+                                                    color: Colors.amber,
+                                                  ),
+                                                Text(userModel.username),
+                                              ],
+                                            ),
                                           ],
                                         ),
                                       );
@@ -294,9 +335,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
                         ? canStart()
                             ? () {}
                             : null
-                        : () {},
+                        : () {
+                            widget.controller.toggleReady(gameCode: gameModel?.code, playerModelList: gameModel?.players);
+                          },
                     style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
-                    child: Text(isHost ? 'START' : 'READY'),
+                    child: Text(isHost
+                        ? 'START'
+                        : widget.controller.isPlayerReady(playerModelList: gameModel?.players)
+                            ? 'UNREADY'
+                            : 'READY'),
                   ),
                   const SizedBox(
                     height: 200,
