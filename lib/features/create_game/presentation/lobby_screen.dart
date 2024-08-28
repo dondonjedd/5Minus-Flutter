@@ -99,7 +99,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
               iconSize: 35,
               onPressed: () async {
                 LoadingOverlay().show(context);
-                widget.controller.deleteGame(gameCode: gameModel?.code ?? '', isHost: isHost);
+                if (isHost) {
+                  await widget.controller.deleteGame(gameCode: gameModel?.code);
+                } else {
+                  await widget.controller.leaveGame(gameModel?.code);
+                }
                 LoadingOverlay().hide();
                 widget.controller.navigateDashboard(context);
               },

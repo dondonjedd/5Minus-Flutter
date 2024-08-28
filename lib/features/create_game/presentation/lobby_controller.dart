@@ -32,8 +32,9 @@ class LobbyController {
   final userCollection = FirebaseFirestore.instance.collection('users');
 
   //DELETE GAME
-  deleteGame({required String gameCode, required bool isHost}) async {
-    if (gameCode.isEmpty || !isHost) return;
+  deleteGame({required String? gameCode}) async {
+    if (gameCode == null) return;
+    if (gameCode.isEmpty) return;
     await matchesCollection.doc(gameCode).delete();
   }
 
@@ -115,6 +116,19 @@ class LobbyController {
     }
 
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+  }
+
+  //LEAVE GAME
+  Future<void> leaveGame(String? gameCode) async {
+    if (gameCode == null) return;
+    if (gameCode.length != 4) return;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (userId != null) {
+      await matchesCollection.doc(gameCode).set({
+        'players': FieldValue.arrayRemove([userCollection.doc(userId)])
+      }, SetOptions(merge: true));
+    }
   }
   //*******************CLIENT********************
 
