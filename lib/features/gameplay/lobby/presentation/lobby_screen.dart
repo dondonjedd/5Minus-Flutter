@@ -3,12 +3,12 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
-import 'package:five_minus/features/create_game/model/game_model.dart';
-import 'package:five_minus/features/create_game/model/lobby_params.dart';
+import 'package:five_minus/features/gameplay/model/game_model.dart';
+import 'package:five_minus/features/gameplay/model/lobby_params.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/component/template/screen_template_view.dart';
-import '../../../core/utility/loading_overlay_utility.dart';
+import '../../../../core/component/template/screen_template_view.dart';
+import '../../../../core/utility/loading_overlay_utility.dart';
 import 'lobby_controller.dart';
 
 class LobbyScreen extends StatefulWidget {

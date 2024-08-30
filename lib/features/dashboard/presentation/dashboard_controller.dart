@@ -1,7 +1,7 @@
 import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
-import 'package:five_minus/features/create_game/model/lobby_params.dart';
-import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
+import 'package:five_minus/features/gameplay/model/lobby_params.dart';
+import 'package:five_minus/features/gameplay/lobby/presentation/lobby_controller.dart';
 import 'package:five_minus/features/join_game/presentation/join_game_controller.dart';
 import 'package:five_minus/features/settings/presentation/settings_controller.dart';
 import 'package:five_minus/features/auth_game_services/model/pgs_user_model.dart';

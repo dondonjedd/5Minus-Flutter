@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
-import 'package:five_minus/features/active_game/model/deck_model.dart';
-import 'package:five_minus/features/create_game/model/player_match_model.dart';
+import 'package:five_minus/features/gameplay/model/deck_model.dart';
+import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
 class GameModel extends Equatable {
   final String hostId;

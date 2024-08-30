@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:five_minus/features/active_game/enums/enum_card_rank.dart';
+import 'package:five_minus/features/gameplay/enums/enum_card_rank.dart';
 
 import '../enums/enum_card_suit.dart';
 import 'card_model.dart';

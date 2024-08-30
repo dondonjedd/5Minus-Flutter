@@ -1,9 +1,9 @@
-import 'package:five_minus/features/active_game/presentation/active_game_controller.dart';
+import 'package:five_minus/features/gameplay/active_game/presentation/active_game_controller.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/features/auth_game_services/presentation/authenticating_controller.dart';
-import 'package:five_minus/features/create_game/model/active_game_params.dart';
-import 'package:five_minus/features/create_game/model/lobby_params.dart';
-import 'package:five_minus/features/create_game/presentation/lobby_controller.dart';
+import 'package:five_minus/features/gameplay/model/active_game_params.dart';
+import 'package:five_minus/features/gameplay/model/lobby_params.dart';
+import 'package:five_minus/features/gameplay/lobby/presentation/lobby_controller.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:five_minus/features/join_game/presentation/join_game_controller.dart';
 import 'package:five_minus/features/leaderboard/presentation/leaderboard_controller.dart';

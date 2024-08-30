@@ -4,8 +4,8 @@ import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../create_game/model/lobby_params.dart';
-import '../../create_game/presentation/lobby_controller.dart';
+import '../../gameplay/model/lobby_params.dart';
+import '../../gameplay/lobby/presentation/lobby_controller.dart';
 import 'join_game_screen.dart';
 
 class JoinGameController {

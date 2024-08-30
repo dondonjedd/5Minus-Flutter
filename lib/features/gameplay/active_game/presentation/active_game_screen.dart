@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:five_minus/features/create_game/model/active_game_params.dart';
+import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/component/template/screen_template_view.dart';
-import '../../../core/utility/loading_overlay_utility.dart';
-import '../../create_game/model/game_model.dart';
+import '../../../../core/component/template/screen_template_view.dart';
+import '../../../../core/utility/loading_overlay_utility.dart';
+import '../../model/game_model.dart';
 import 'active_game_controller.dart';
 
 class ActiveGameScreen extends StatefulWidget {

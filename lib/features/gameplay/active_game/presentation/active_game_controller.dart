@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/features/active_game/model/deck_model.dart';
-import 'package:five_minus/features/create_game/model/active_game_params.dart';
+import 'package:five_minus/features/gameplay/model/deck_model.dart';
+import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../create_game/model/game_model.dart';
-import '../../create_game/model/player_match_model.dart';
-import '../../dashboard/presentation/dashboard_controller.dart';
+import '../../model/game_model.dart';
+import '../../model/player_match_model.dart';
+import '../../../dashboard/presentation/dashboard_controller.dart';
 import 'active_game_screen.dart';
 
 class ActiveGameController {
