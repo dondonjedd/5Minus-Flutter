@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/features/active_game/presentation/active_game_controller.dart';
+import 'package:five_minus/features/create_game/model/active_game_params.dart';
 import 'package:five_minus/features/create_game/model/game_model.dart';
 import 'package:five_minus/features/create_game/model/lobby_params.dart';
 import 'package:five_minus/features/create_game/model/player_match_model.dart';
@@ -34,6 +36,13 @@ class LobbyController {
   final matchesCollection = FirebaseFirestore.instance.collection('matches');
   final userCollection = FirebaseFirestore.instance.collection('users');
 
+  //START GAME
+  startGame({required String? gameCode}) async {
+    if (gameCode == null) return;
+    await FirebaseFirestore.instance.collection('matches').doc(gameCode).update({'is_active': true});
+    return;
+  }
+
   //DELETE GAME
   deleteGame({required String? gameCode}) async {
     if (gameCode == null) return;
@@ -56,9 +65,13 @@ class LobbyController {
     final hostId = FirebaseAuth.instance.currentUser?.uid;
 
     if (hostId != null) {
-      await matchesCollection.doc(gameCode).set(
-          GameModel(hostId: hostId, code: gameCode, players: [PlayerMatchModel(player: userCollection.doc(hostId), isReady: true)], gameType: 0)
-              .toMap());
+      await matchesCollection.doc(gameCode).set(GameModel(
+              hostId: hostId,
+              code: gameCode,
+              players: [PlayerMatchModel(player: userCollection.doc(hostId), isReady: true)],
+              gameType: 0,
+              isActive: false)
+          .toMap());
     }
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
@@ -181,5 +194,11 @@ class LobbyController {
 
   navigateDashboard(BuildContext context) {
     context.goNamed(DashboardController.routeName);
+  }
+
+  navigateActiveGame(BuildContext context, {required String? gameCode}) {
+    if (gameCode == null) return;
+
+    context.goNamed(ActiveGameController.routeName, extra: ActiveGameParams(gameCode: gameCode));
   }
 }

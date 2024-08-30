@@ -71,6 +71,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
             selectedGameType[i] = i == gameModel!.gameType;
           }
         }
+        if (gameModel?.isActive == true) {
+          widget.controller.navigateActiveGame(context, gameCode: gameModel?.code);
+        }
       } else {
         widget.controller.navigateDashboard(context);
       }
@@ -78,9 +81,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   bool canStart() {
-    if ((gameModel?.players?.length ?? 0) < 2) return false;
+    if ((gameModel?.players.length ?? 0) < 2) return false;
     if (!isHost) return false;
-    if (gameModel?.players?.any(
+    if (gameModel?.players.any(
           (element) {
             return !(element.isReady ?? false);
           },
@@ -146,7 +149,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Row(
                       children: [
-                        ...gameModel?.players?.map(
+                        ...gameModel?.players.map(
                               (model) {
                                 return FutureBuilder(
                                   future: model.player?.get(),
@@ -228,7 +231,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ).toList() ??
                             [],
                         ...List.generate(
-                          4 - (gameModel?.players?.length ?? 0),
+                          4 - (gameModel?.players.length ?? 0),
                           (index) {
                             return Expanded(
                               child: Column(
@@ -332,7 +335,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ElevatedButton(
                     onPressed: isHost
                         ? canStart()
-                            ? () {}
+                            ? () {
+                                widget.controller.startGame(gameCode: gameModel?.code);
+                              }
                             : null
                         : () {
                             widget.controller.toggleReady(gameCode: gameModel?.code, playerModelList: gameModel?.players);
