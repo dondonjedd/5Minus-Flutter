@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dotted_border/dotted_border.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
+import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
@@ -95,7 +97,49 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                 color: Colors.white,
               ),
             )
-          : const Center(child: Text('layout')),
+          : Center(
+              child: SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.3,
+              width: MediaQuery.sizeOf(context).width * 0.3,
+              child: DottedBorder(
+                color: Colors.white,
+                borderType: BorderType.RRect,
+                radius: const Radius.circular(50),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (gameModel?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                        Expanded(
+                          flex: 3,
+                          child: UnconstrainedBox(
+                            child: SizedBox(
+                              height: 80,
+                              child: Image.asset(
+                                AssetPath.drawDeck5Plus,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        flex: 4,
+                        child: UnconstrainedBox(
+                          child: SizedBox(
+                            height: 80,
+                            child: Image.asset(
+                              AssetPath.discardPile4Plus,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )),
     );
   }
 }

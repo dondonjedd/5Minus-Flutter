@@ -47,7 +47,7 @@ class ActiveGameController {
     if (gameCode == null) return null;
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
-    await matchesCollection.doc(gameCode).update({'deck': Deck(generateNewRandomDeck: true).toMapList()});
+    await matchesCollection.doc(gameCode).update({'draw_deck': Deck(generateNewRandomDeck: true).toMapList()});
 
     return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
   }
