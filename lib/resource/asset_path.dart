@@ -15,4 +15,5 @@ class AssetPath {
   static const String leaderboard = '$_basePathIcon/leaderboard_icon.svg';
   static const String drawDeck5Plus = '$_basePathImage/draw_deck_5plus.png';
   static const String discardPile4Plus = '$_basePathImage/discard_pile_4plus.png';
+  static const String backCard = '$_basePathImage/back_card.png';
 }

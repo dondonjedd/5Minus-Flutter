@@ -47,9 +47,30 @@ class ActiveGameController {
     if (gameCode == null) return null;
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
-    await matchesCollection.doc(gameCode).update({'draw_deck': Deck(generateNewRandomDeck: true).toMapList()});
+    GameModel? gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
 
-    return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+    Deck deck = Deck(generateNewRandomDeck: true);
+
+    while (gameModel.players.any(
+      (element) {
+        return element.playerHand?.length != 4;
+      },
+    )) {
+      for (var player in gameModel.players) {
+        player.playerHand?.add(deck.getCardFromDeck());
+      }
+    }
+
+    await matchesCollection.doc(gameModel.code).update({
+      'draw_deck': deck.toMapList(),
+      'players': gameModel.players.map(
+        (e) {
+          return e.toMap();
+        },
+      ).toList(),
+    });
+
+    return GameModel.fromMap((await matchesCollection.doc(gameModel.code).get()).data() ?? {});
   }
 
   //DELETE GAME

@@ -97,49 +97,93 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                 color: Colors.white,
               ),
             )
-          : Center(
-              child: SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.3,
-              width: MediaQuery.sizeOf(context).width * 0.3,
-              child: DottedBorder(
-                color: Colors.white,
-                borderType: BorderType.RRect,
-                radius: const Radius.circular(50),
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      if (gameModel?.drawDeck?.cardDeck?.isNotEmpty ?? false)
-                        Expanded(
-                          flex: 3,
-                          child: UnconstrainedBox(
-                            child: SizedBox(
-                              height: 80,
-                              child: Image.asset(
-                                AssetPath.drawDeck5Plus,
-                                fit: BoxFit.contain,
+          : SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Expanded(child: SizedBox()),
+                  const SizedBox(
+                    height: 12,
+                  ),
+                  Expanded(
+                    child: SizedBox(
+                      width: MediaQuery.sizeOf(context).width * 0.4,
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: (gameModel?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                                  ? UnconstrainedBox(
+                                      child: SizedBox(
+                                        height: 80,
+                                        child: Image.asset(
+                                          AssetPath.drawDeck5Plus,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                            Expanded(
+                              child: (gameModel?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                                  ? UnconstrainedBox(
+                                      child: SizedBox(
+                                        height: 60,
+                                        child: Image.asset(
+                                          AssetPath.backCard,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: DottedBorder(
+                                color: Colors.white,
+                                borderType: BorderType.Circle,
+                                child: (gameModel?.discardDeck?.cardDeck?.isNotEmpty ?? false)
+                                    ? UnconstrainedBox(
+                                        child: SizedBox(
+                                          height: 80,
+                                          child: Image.asset(
+                                            AssetPath.discardPile4Plus,
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                      )
+                                    : const SizedBox.expand(),
                               ),
                             ),
-                          ),
-                        ),
-                      Expanded(
-                        flex: 4,
-                        child: UnconstrainedBox(
-                          child: SizedBox(
-                            height: 80,
-                            child: Image.asset(
-                              AssetPath.discardPile4Plus,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(
+                    height: 12,
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: gameModel?.players[0].playerHand?.length ?? 0,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard))),
+                        );
+                      },
+                    ),
+                  )
+                ],
               ),
-            )),
+            ),
     );
   }
 }
