@@ -18,10 +18,6 @@ enum CardRank {
 
   const CardRank(this.internalRepresentation, this.asCharacter);
 
-  toMap() {
-    return {'rank': internalRepresentation};
-  }
-
   static CardRank? fromIr(int ir) {
     // Find the CardRank with matching internalRepresentation
     return CardRank.values.firstWhere(

@@ -13,9 +13,6 @@ enum CardSuit {
   String get asCharacter => switch (this) { CardSuit.spades => '♠', CardSuit.hearts => '♥', CardSuit.diamonds => '♦', CardSuit.clubs => '♣' };
 
   Color get color => switch (this) { CardSuit.spades || CardSuit.clubs => Colors.black, CardSuit.hearts || CardSuit.diamonds => Colors.red };
-  toMap() {
-    return {'suit': internalRepresentation};
-  }
 
   // Converts a Map representation back to a CardRank enum value
   static CardSuit? fromIr(int ir) {
