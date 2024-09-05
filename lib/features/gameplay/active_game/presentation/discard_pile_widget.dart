@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../resource/asset_path.dart';
 import '../../model/card_model.dart';
 import '../../model/game_model.dart';
+import 'front_card_widget.dart';
 
 class DiscardPile extends StatelessWidget {
   const DiscardPile({
@@ -45,24 +46,7 @@ class DiscardPile extends StatelessWidget {
                                   left: 0,
                                   bottom: 0,
                                   top: 0,
-                                  child: UnconstrainedBox(
-                                    child: Container(
-                                      width: 40,
-                                      height: 60,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(5),
-                                        border: Border.all(color: Colors.grey, width: 0.5),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          '${discardPileCardList.last.suit?.asCharacter}\n${discardPileCardList.last.rank?.asCharacter}',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(color: discardPileCardList.last.suit?.color, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  child: FrontCard(cardModel: discardPileCardList.last),
                                 ),
                               ],
                             ),

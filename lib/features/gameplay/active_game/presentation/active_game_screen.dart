@@ -61,8 +61,6 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Widget backCardWidget = UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard)));
-
     MatchCubit matchCubit = context.read<MatchCubit>();
 
     return ScreenTemplateView(
@@ -150,12 +148,23 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                   const SizedBox(
                     height: 12,
                   ),
-                  Expanded(
-                    child: PlayerHands(backCardWidget: backCardWidget),
+                  const Expanded(
+                    child: PlayerHands(),
                   )
                 ],
               ),
             ),
     );
+  }
+}
+
+class BackCard extends StatelessWidget {
+  const BackCard({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard)));
   }
 }

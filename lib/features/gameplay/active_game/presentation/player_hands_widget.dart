@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../model/game_model.dart';
+import 'back_card_widget.dart';
 import 'cubit/match_cubit.dart';
 
 class PlayerHands extends StatelessWidget {
   const PlayerHands({
     super.key,
-    required this.backCardWidget,
   });
-
-  final Widget backCardWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +25,12 @@ class PlayerHands extends StatelessWidget {
               child: Draggable(
                 feedback: Transform.rotate(
                   angle: 0.5,
-                  child: backCardWidget,
+                  child: const BackCard(),
                 ),
                 data: state?.players[0].playerHand?[index],
-                childWhenDragging: Opacity(
+                childWhenDragging: const Opacity(
                   opacity: 0.5,
-                  child: backCardWidget,
+                  child: BackCard(),
                 ),
                 onDragCompleted: () {
                   // CardModel? cardDiscarded = state?.players[0].playerHand?.removeAt(index);
@@ -47,7 +45,7 @@ class PlayerHands extends StatelessWidget {
                   // final audioController = context.read<AudioController>();
                   // audioController.playSfx(SfxType.wssh);
                 },
-                child: backCardWidget,
+                child: const BackCard(),
               ),
             );
           },
