@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../model/card_model.dart';
+import '../../../model/card_model.dart';
 
 class FrontCard extends StatelessWidget {
   const FrontCard({

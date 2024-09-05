@@ -3,9 +3,9 @@ import 'package:five_minus/features/gameplay/active_game/presentation/cubit/matc
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../resource/asset_path.dart';
-import '../../model/card_model.dart';
-import '../../model/game_model.dart';
+import '../../../../../resource/asset_path.dart';
+import '../../../model/card_model.dart';
+import '../../../model/game_model.dart';
 import 'front_card_widget.dart';
 
 class DiscardPile extends StatelessWidget {

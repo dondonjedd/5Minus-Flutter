@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../model/game_model.dart';
+import '../../../model/game_model.dart';
 import 'back_card_widget.dart';
-import 'cubit/match_cubit.dart';
+import '../cubit/match_cubit.dart';
 
 class PlayerHands extends StatelessWidget {
   const PlayerHands({

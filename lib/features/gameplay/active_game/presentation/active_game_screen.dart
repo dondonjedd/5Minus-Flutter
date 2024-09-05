@@ -9,8 +9,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
 import 'active_game_controller.dart';
-import 'discard_pile_widget.dart';
-import 'player_hands_widget.dart';
+import 'widgets/discard_pile_widget.dart';
+import 'widgets/player_hands_widget.dart';
 
 class ActiveGameScreen extends StatefulWidget {
   final ActiveGameController controller;
@@ -155,16 +155,5 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
               ),
             ),
     );
-  }
-}
-
-class BackCard extends StatelessWidget {
-  const BackCard({
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard)));
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../resource/asset_path.dart';
+import '../../../../../resource/asset_path.dart';
 
 class BackCard extends StatelessWidget {
   const BackCard({
