@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-import 'package:equatable/equatable.dart';
 import 'package:five_minus/features/gameplay/model/deck_model.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
-class GameModel extends Equatable {
+class GameModel {
   final String hostId;
   final String code;
   final List<PlayerMatchModel> players;
@@ -114,8 +113,4 @@ class GameModel extends Equatable {
         isChallengeComplete: isChallengeComplete ?? this.isChallengeComplete,
         winner: winner ?? this.winner);
   }
-
-  @override
-  // TODO: implement props
-  List<Object?> get props => [code];
 }

@@ -56,7 +56,7 @@ class Deck {
   }
 
   getCardFromDeck() {
-    return cardDeck?.removeAt(0);
+    return cardDeck?.removeLast();
   }
 
   List<Map<String, dynamic>> toMapList() {

@@ -1,15 +1,16 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dotted_border/dotted_border.dart';
+import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
-import '../../model/game_model.dart';
 import 'active_game_controller.dart';
+import 'discard_pile_widget.dart';
+import 'player_hands_widget.dart';
 
 class ActiveGameScreen extends StatefulWidget {
   final ActiveGameController controller;
@@ -22,9 +23,9 @@ class ActiveGameScreen extends StatefulWidget {
 
 class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool isLoading = false;
-  GameModel? gameModel;
   bool isHost = false;
   StreamSubscription? _gameStreamSubscription;
+
   @override
   void dispose() {
     _gameStreamSubscription?.cancel();
@@ -38,15 +39,16 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
         setState(() {
           isLoading = true;
         });
+        MatchCubit matchCubit = context.read<MatchCubit>();
 
         //INITIALIZE
-        gameModel = await widget.controller.initializeGame(widget.activeGameParams.gameCode);
-
+        await matchCubit.initalize(widget.activeGameParams.gameCode);
         //INITIALIZE ISHOST
-        if (gameModel?.hostId != null) isHost = widget.controller.isHost(hostId: gameModel!.hostId);
+        isHost = matchCubit.isHost();
 
         //LISTEN CHANGES
-        _gameStreamSubscription = widget.controller.listenToChanges(gameModel, _updateLocalFromFirestore);
+        if (!context.mounted) return;
+        _gameStreamSubscription = widget.controller.listenToChanges(context);
 
         setState(() {
           isLoading = false;
@@ -57,18 +59,12 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     super.initState();
   }
 
-  void _updateLocalFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) {
-    setState(() {
-      if (event.data() != null) {
-        gameModel = GameModel.fromMap(event.data()!);
-      } else {
-        widget.controller.navigateDashboard(context);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    Widget backCardWidget = UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard)));
+
+    MatchCubit matchCubit = context.read<MatchCubit>();
+
     return ScreenTemplateView(
       //Close Button
       suffixActionList: [
@@ -81,11 +77,12 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
               onPressed: () async {
                 LoadingOverlay().show(context);
                 if (isHost) {
-                  await widget.controller.deleteGame(gameCode: gameModel?.code);
+                  await matchCubit.deleteGame();
                 } else {
-                  await widget.controller.leaveGame(gameCode: gameModel?.code, playerModelList: gameModel?.players);
+                  await matchCubit.leaveGame();
                 }
                 LoadingOverlay().hide();
+                if (!context.mounted) return;
                 widget.controller.navigateDashboard(context);
               },
               icon: const Icon(Icons.cancel_outlined)),
@@ -116,7 +113,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
-                              child: (gameModel?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                              child: (matchCubit.state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
                                   ? UnconstrainedBox(
                                       child: SizedBox(
                                         height: 80,
@@ -129,7 +126,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                   : const SizedBox.shrink(),
                             ),
                             Expanded(
-                              child: (gameModel?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                              child: (matchCubit.state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
                                   ? UnconstrainedBox(
                                       child: SizedBox(
                                         height: 60,
@@ -141,23 +138,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     )
                                   : const SizedBox.shrink(),
                             ),
-                            Expanded(
+                            const Expanded(
                               flex: 2,
-                              child: DottedBorder(
-                                color: Colors.white,
-                                borderType: BorderType.Circle,
-                                child: (gameModel?.discardDeck?.cardDeck?.isNotEmpty ?? false)
-                                    ? UnconstrainedBox(
-                                        child: SizedBox(
-                                          height: 80,
-                                          child: Image.asset(
-                                            AssetPath.discardPile4Plus,
-                                            fit: BoxFit.contain,
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox.expand(),
-                              ),
+                              child: DiscardPile(),
                             ),
                           ],
                         ),
@@ -168,18 +151,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                     height: 12,
                   ),
                   Expanded(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: gameModel?.players[0].playerHand?.length ?? 0,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard))),
-                        );
-                      },
-                    ),
+                    child: PlayerHands(backCardWidget: backCardWidget),
                   )
                 ],
               ),

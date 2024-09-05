@@ -1,14 +1,11 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/features/gameplay/model/deck_model.dart';
+import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../model/game_model.dart';
-import '../../model/player_match_model.dart';
 import '../../../dashboard/presentation/dashboard_controller.dart';
 import 'active_game_screen.dart';
 
@@ -17,87 +14,36 @@ class ActiveGameController {
   static Widget screen({
     required ActiveGameParams activeGameParams,
   }) {
-    return ActiveGameScreen(
-      controller: ActiveGameController._(),
-      activeGameParams: activeGameParams,
+    return BlocProvider(
+      create: (context) => MatchCubit(),
+      child: ActiveGameScreen(
+        controller: ActiveGameController._(),
+        activeGameParams: activeGameParams,
+      ),
     );
   }
 
   ActiveGameController._();
   final matchesCollection = FirebaseFirestore.instance.collection('matches');
 
-  bool isHost({required String? hostId, String? uid}) {
-    if (hostId == null) return false;
-    if (hostId.isEmpty) return false;
-    return hostId == (uid ?? FirebaseAuth.instance.currentUser?.uid);
-  }
+  StreamSubscription? listenToChanges(BuildContext context) {
+    bool isGameExist = true;
+    MatchCubit matchCubit = context.read<MatchCubit>();
 
-  StreamSubscription? listenToChanges(GameModel? gameModel, void Function(DocumentSnapshot<Map<String, dynamic>>)? onData) {
-    if (gameModel?.code != null) {
-      return FirebaseFirestore.instance.collection('matches').doc(gameModel?.code).snapshots().listen(onData);
+    if (matchCubit.state?.code != null) {
+      return FirebaseFirestore.instance.collection('matches').doc(matchCubit.state?.code).snapshots().listen(
+        (event) {
+          isGameExist = matchCubit.updateFromFirestore(event);
+          if (!isGameExist) {
+            if (context.mounted) navigateDashboard(context);
+          }
+        },
+      );
     }
     return null;
   }
 
   navigateDashboard(BuildContext context) {
     context.goNamed(DashboardController.routeName);
-  }
-
-  Future<GameModel?> initializeGame(String? gameCode) async {
-    if (gameCode == null) return null;
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-
-    GameModel? gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
-
-    Deck deck = Deck(generateNewRandomDeck: true);
-
-    while (gameModel.players.any(
-      (element) {
-        return element.playerHand?.length != 4;
-      },
-    )) {
-      for (var player in gameModel.players) {
-        player.playerHand?.add(deck.getCardFromDeck());
-      }
-    }
-
-    await matchesCollection.doc(gameModel.code).update({
-      'draw_deck': deck.toMapList(),
-      'players': gameModel.players.map(
-        (e) {
-          return e.toMap();
-        },
-      ).toList(),
-    });
-
-    return GameModel.fromMap((await matchesCollection.doc(gameModel.code).get()).data() ?? {});
-  }
-
-  //DELETE GAME
-  deleteGame({required String? gameCode}) async {
-    if (gameCode == null) return;
-    if (gameCode.isEmpty) return;
-    await matchesCollection.doc(gameCode).delete();
-  }
-
-  //LEAVE GAME
-  Future<void> leaveGame({required String? gameCode, required List<PlayerMatchModel>? playerModelList}) async {
-    if (gameCode == null || playerModelList == null) return;
-    if (gameCode.length != 4) return;
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    playerModelList.removeWhere(
-      (element) {
-        return element.player?.id == userId;
-      },
-    );
-    if (userId != null) {
-      await matchesCollection.doc(gameCode).set({
-        'players': playerModelList.map(
-          (e) {
-            return e.toMap();
-          },
-        ).toList()
-      }, SetOptions(merge: true));
-    }
   }
 }
