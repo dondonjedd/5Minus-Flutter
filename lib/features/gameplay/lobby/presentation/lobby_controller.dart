@@ -164,7 +164,7 @@ class LobbyController {
     playerModelList = playerModelList.map(
       (e) {
         if (e.player?.id == userId) {
-          e.isReady = !(e.isReady ?? true);
+          e = e.copyWith(isReady: !(e.isReady ?? true));
         }
         return e;
       },
@@ -185,7 +185,7 @@ class LobbyController {
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
     return playerModelList.firstWhere((element) => element.player?.id == userId, orElse: () {
-          return PlayerMatchModel(player: null, isReady: false);
+          return const PlayerMatchModel(player: null, isReady: false);
         }).isReady ??
         false;
   }

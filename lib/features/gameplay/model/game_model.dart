@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:five_minus/features/gameplay/model/deck_model.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
+import 'card_model.dart';
+
 class GameModel {
   final String hostId;
   final String code;
@@ -12,6 +14,7 @@ class GameModel {
   final Deck? drawDeck;
   final Deck? discardDeck;
   final int? turn;
+  final CardModel? drawnCard;
   final DateTime? turnStartTime;
   final DateTime? powerStartTime;
   final bool? isChallengeComplete;
@@ -26,6 +29,7 @@ class GameModel {
     this.drawDeck,
     this.discardDeck,
     this.turn,
+    this.drawnCard,
     this.turnStartTime,
     this.powerStartTime,
     this.isChallengeComplete = false,
@@ -46,6 +50,7 @@ class GameModel {
         drawDeck: data['draw_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['draw_deck']),
         discardDeck: data['discard_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['discard_deck']),
         turn: data['turn'],
+        drawnCard: data['drawn_card'] == null ? null : CardModel.fromMap(data['drawn_card']),
         turnStartTime: DateTime.tryParse(
           data['turn_start_time'] ?? '',
         ),
@@ -69,6 +74,7 @@ class GameModel {
         'draw_deck': drawDeck?.toMapList(),
         'discard_deck': discardDeck?.toMapList(),
         'turn': turn,
+        'drawn_card': drawnCard,
         'turn_start_time': turnStartTime,
         'power_start_time': powerStartTime,
         'is_challenge_complete': isChallengeComplete,
@@ -94,6 +100,7 @@ class GameModel {
     Deck? drawDeck,
     Deck? discardDeck,
     int? turn,
+    CardModel? drawnCard,
     DateTime? turnStartTime,
     DateTime? powerStartTime,
     bool? isChallengeComplete,
@@ -108,6 +115,7 @@ class GameModel {
         drawDeck: drawDeck ?? this.drawDeck,
         discardDeck: discardDeck ?? this.discardDeck,
         turn: turn ?? this.turn,
+        drawnCard: drawnCard ?? this.drawnCard,
         turnStartTime: turnStartTime ?? this.turnStartTime,
         powerStartTime: powerStartTime ?? this.powerStartTime,
         isChallengeComplete: isChallengeComplete ?? this.isChallengeComplete,

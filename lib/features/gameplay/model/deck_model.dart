@@ -1,11 +1,12 @@
 import 'dart:convert';
 
+import 'package:equatable/equatable.dart';
 import 'package:five_minus/features/gameplay/enums/enum_card_rank.dart';
 
 import '../enums/enum_card_suit.dart';
 import 'card_model.dart';
 
-class Deck {
+class Deck extends Equatable {
   List<CardModel>? cardDeck;
 
   Deck({this.cardDeck, bool generateNewRandomDeck = false}) {
@@ -74,4 +75,8 @@ class Deck {
   String toJson() => json.encode(toMapList());
 
   factory Deck.fromJson(String source) => Deck.fromMapList(json.decode(source));
+
+  @override
+  // TODO: implement props
+  List<Object?> get props => [cardDeck];
 }

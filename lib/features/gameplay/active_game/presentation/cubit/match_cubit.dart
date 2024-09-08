@@ -81,11 +81,13 @@ class MatchCubit extends Cubit<GameModel?> {
     return false;
   }
 
-  //remove hand
+  //Discard Card
   discardHand(int playerIndex, int cardIndex) async {
     GameModel? gameModel = state?.copyWith();
     CardModel? cardDiscarded = gameModel?.players[playerIndex].playerHand?.removeAt(cardIndex);
     if (cardDiscarded != null) gameModel?.discardDeck?.cardDeck?.add(cardDiscarded);
+
+    emit(gameModel);
 
     await matchesCollection.doc(gameModel?.code).update({
       'discard_deck': gameModel?.discardDeck?.toMapList(),
@@ -95,5 +97,33 @@ class MatchCubit extends Cubit<GameModel?> {
         },
       ).toList(),
     });
+  }
+
+  //Draw Card
+  Future<void> drawCard() async {
+    GameModel? gameModel = state?.copyWith();
+    CardModel? cardDiscarded = gameModel?.drawDeck?.getCardFromDeck();
+
+    emit(gameModel?.copyWith(drawnCard: cardDiscarded));
+
+    await matchesCollection.doc(gameModel?.code).update({
+      'draw_deck': gameModel?.drawDeck?.toMapList(),
+      'drawn_card': cardDiscarded?.toMap(),
+    });
+  }
+
+  int? getUserIndex() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    final userIndex = state?.players.indexWhere(
+      (element) {
+        return (element.player?.id == uid);
+      },
+    );
+
+    if (userIndex == -1) {
+      return null;
+    }
+    return userIndex;
   }
 }

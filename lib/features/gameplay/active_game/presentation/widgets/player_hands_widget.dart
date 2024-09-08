@@ -6,9 +6,9 @@ import 'back_card_widget.dart';
 import '../cubit/match_cubit.dart';
 
 class PlayerHands extends StatelessWidget {
-  const PlayerHands({
-    super.key,
-  });
+  const PlayerHands({super.key, required this.playerIndex});
+
+  final int playerIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class PlayerHands extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           scrollDirection: Axis.horizontal,
-          itemCount: state?.players[0].playerHand?.length ?? 0,
+          itemCount: state?.players[playerIndex].playerHand?.length ?? 0,
           itemBuilder: (context, index) {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -27,7 +27,7 @@ class PlayerHands extends StatelessWidget {
                   angle: 0.5,
                   child: const BackCard(),
                 ),
-                data: state?.players[0].playerHand?[index],
+                data: state?.players[playerIndex].playerHand?[index],
                 childWhenDragging: const Opacity(
                   opacity: 0.5,
                   child: BackCard(),

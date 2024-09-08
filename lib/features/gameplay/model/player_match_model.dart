@@ -1,15 +1,16 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:equatable/equatable.dart';
 import 'package:five_minus/features/gameplay/model/card_model.dart';
 
-class PlayerMatchModel {
-  DocumentReference<Map<String, dynamic>>? player;
-  bool? isReady;
-  List<CardModel>? playerHand;
-  bool? isChallengedDeclard;
+class PlayerMatchModel extends Equatable {
+  final DocumentReference<Map<String, dynamic>>? player;
+  final bool? isReady;
+  final List<CardModel>? playerHand;
+  final bool? isChallengedDeclard;
 
-  PlayerMatchModel({
+  const PlayerMatchModel({
     this.player,
     this.isReady = false,
     this.playerHand,
@@ -56,4 +57,8 @@ class PlayerMatchModel {
       isChallengedDeclard: isChallengedDeclard ?? this.isChallengedDeclard,
     );
   }
+
+  @override
+  // TODO: implement props
+  List<Object?> get props => [player, isReady, playerHand, isChallengedDeclard];
 }

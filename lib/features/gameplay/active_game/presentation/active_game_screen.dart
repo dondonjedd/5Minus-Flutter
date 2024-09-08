@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
+import 'package:five_minus/features/gameplay/active_game/presentation/widgets/front_card_widget.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
+import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -25,6 +27,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool isLoading = false;
   bool isHost = false;
   StreamSubscription? _gameStreamSubscription;
+  int? userIndex;
 
   @override
   void dispose() {
@@ -49,7 +52,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
         //LISTEN CHANGES
         if (!context.mounted) return;
         _gameStreamSubscription = widget.controller.listenToChanges(context);
-
+        userIndex = matchCubit.getUserIndex();
         setState(() {
           isLoading = false;
         });
@@ -98,7 +101,12 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Expanded(child: SizedBox()),
+                  const Expanded(
+                    child: SizedBox(),
+                    // child: PlayerHands(
+                    //   playerIndex: 1,
+                    // ),
+                  ),
                   const SizedBox(
                     height: 12,
                   ),
@@ -110,32 +118,34 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            //Draw Deck
                             Expanded(
                               child: (matchCubit.state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
-                                  ? UnconstrainedBox(
-                                      child: SizedBox(
-                                        height: 80,
-                                        child: Image.asset(
-                                          AssetPath.drawDeck5Plus,
-                                          fit: BoxFit.contain,
+                                  ? InkWell(
+                                      onTap: () {
+                                        matchCubit.drawCard();
+                                      },
+                                      child: UnconstrainedBox(
+                                        child: SizedBox(
+                                          height: 80,
+                                          child: Image.asset(
+                                            AssetPath.drawDeck5Plus,
+                                            fit: BoxFit.contain,
+                                          ),
                                         ),
                                       ),
                                     )
-                                  : const SizedBox.shrink(),
+                                  : const SizedBox.expand(),
                             ),
-                            Expanded(
-                              child: (matchCubit.state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
-                                  ? UnconstrainedBox(
-                                      child: SizedBox(
-                                        height: 60,
-                                        child: Image.asset(
-                                          AssetPath.backCard,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
+                            //Drawn Card
+                            BlocBuilder<MatchCubit, GameModel?>(
+                              builder: (context, state) {
+                                return Expanded(
+                                  child: (state?.drawnCard != null) ? FrontCard(cardModel: state!.drawnCard!) : const SizedBox.expand(),
+                                );
+                              },
                             ),
+                            //Discard pile
                             const Expanded(
                               flex: 2,
                               child: DiscardPile(),
@@ -148,8 +158,12 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                   const SizedBox(
                     height: 12,
                   ),
-                  const Expanded(
-                    child: PlayerHands(),
+                  Expanded(
+                    child: userIndex != null
+                        ? PlayerHands(
+                            playerIndex: userIndex!,
+                          )
+                        : const SizedBox.expand(),
                   )
                 ],
               ),
