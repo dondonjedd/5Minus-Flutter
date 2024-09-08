@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:collection/collection.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/lobby_params.dart';
+import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
@@ -62,22 +64,43 @@ class _LobbyScreenState extends State<LobbyScreen> {
     super.initState();
   }
 
-  void _updateLocalFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) {
-    setState(() {
-      if (event.data() != null) {
-        gameModel = GameModel.fromMap(event.data()!);
-        if (gameModel?.gameType != null) {
-          for (int i = 0; i < selectedGameType.length; i++) {
-            selectedGameType[i] = i == gameModel!.gameType;
-          }
+  void _updateLocalFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) async {
+    if (event.data() != null) {
+      GameModel tempGameModel = GameModel.fromMap(event.data()!);
+
+      List<PlayerMatchModel> tmpList = [];
+
+      for (PlayerMatchModel element in tempGameModel.players) {
+        // Find the matching element from gameModelPlayers
+        PlayerMatchModel? matchingElement = gameModel?.players.firstWhereOrNull((el2) => el2 == element);
+
+        if (matchingElement != null) {
+          // Add the element from gameModelPlayers
+          tmpList.add(matchingElement);
+        } else {
+          // Load player data if no match found
+          final data = (await element.player?.get())?.data();
+          tmpList.add(
+            element.copyWith(
+              loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data),
+            ),
+          );
         }
-        if (gameModel?.isActive == true) {
-          widget.controller.navigateActiveGame(context, gameCode: gameModel?.code);
-        }
-      } else {
-        widget.controller.navigateDashboard(context);
       }
-    });
+
+      gameModel = tempGameModel.copyWith(gameType: tempGameModel.gameType, players: tmpList);
+      if (gameModel?.gameType != null) {
+        for (int i = 0; i < selectedGameType.length; i++) {
+          selectedGameType[i] = i == gameModel!.gameType;
+        }
+      }
+      if (gameModel?.isActive == true) {
+        widget.controller.navigateActiveGame(context, gameCode: gameModel?.code);
+      }
+    } else {
+      widget.controller.navigateDashboard(context);
+    }
+    setState(() {});
   }
 
   bool canStart() {
@@ -151,81 +174,75 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       children: [
                         ...gameModel?.players.map(
                               (model) {
-                                return FutureBuilder(
-                                  future: model.player?.get(),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData) {
-                                      final userModel = FirebaseUserModel.fromMap(snapshot.data?.data() ?? {});
-                                      return Expanded(
-                                        child: Column(
+                                if (model.loadedPlayer != null) {
+                                  return Expanded(
+                                    child: Column(
+                                      children: [
+                                        Stack(
                                           children: [
-                                            Stack(
-                                              children: [
-                                                ClipOval(
-                                                    child: Image.memory(
-                                                  base64Decode(userModel.icon ?? ''),
-                                                  width: 60,
-                                                  height: 60,
-                                                  gaplessPlayback: true,
-                                                )),
-                                                Positioned(
-                                                  top: 3,
-                                                  right: 3,
-                                                  child: Container(
-                                                    width: 14,
-                                                    height: 14,
-                                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                                                  ),
-                                                ),
-                                                Positioned(
-                                                  top: 0,
-                                                  right: 0,
-                                                  child: Icon(
-                                                    (model.isReady ?? false) ? Icons.check_circle : Icons.cancel,
-                                                    color: (model.isReady ?? false) ? Colors.green : Colors.red,
-                                                    size: 20,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                if (widget.controller.isHost(hostId: gameModel?.hostId ?? '', uid: userModel.playerId ?? ''))
-                                                  const Icon(
-                                                    Icons.person,
-                                                    color: Colors.amber,
-                                                  ),
-                                                Text(userModel.username),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    } else {
-                                      return Expanded(
-                                        child: Column(
-                                          children: [
-                                            SizedBox(
+                                            ClipOval(
+                                                child: Image.memory(
+                                              base64Decode(model.loadedPlayer?.icon ?? ''),
                                               width: 60,
                                               height: 60,
+                                              gaplessPlayback: true,
+                                            )),
+                                            Positioned(
+                                              top: 3,
+                                              right: 3,
                                               child: Container(
-                                                decoration: BoxDecoration(
-                                                    border: Border.all(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(100)),
-                                                child: const Padding(
-                                                    padding: EdgeInsets.all(12),
-                                                    child: CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: Colors.white,
-                                                    )),
+                                                width: 14,
+                                                height: 14,
+                                                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                                               ),
                                             ),
-                                            const Text('-'),
+                                            Positioned(
+                                              top: 0,
+                                              right: 0,
+                                              child: Icon(
+                                                (model.isReady ?? false) ? Icons.check_circle : Icons.cancel,
+                                                color: (model.isReady ?? false) ? Colors.green : Colors.red,
+                                                size: 20,
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                      );
-                                    }
-                                  },
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            if (widget.controller.isHost(hostId: gameModel?.hostId ?? '', uid: model.loadedPlayer?.playerId ?? ''))
+                                              const Icon(
+                                                Icons.person,
+                                                color: Colors.amber,
+                                              ),
+                                            Text(model.loadedPlayer?.username ?? '-'),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                return Expanded(
+                                  child: Column(
+                                    children: [
+                                      SizedBox(
+                                        width: 60,
+                                        height: 60,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                              border: Border.all(color: Colors.white, width: 2), borderRadius: BorderRadius.circular(100)),
+                                          child: const Padding(
+                                              padding: EdgeInsets.all(12),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              )),
+                                        ),
+                                      ),
+                                      const Text('-'),
+                                    ],
+                                  ),
                                 );
                               },
                             ).toList() ??

@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/active_game_controller.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
@@ -73,7 +74,18 @@ class LobbyController {
               isActive: false)
           .toMap());
     }
-    return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+
+    GameModel gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+    List<PlayerMatchModel> players = [];
+
+    for (final e in gameModel.players) {
+      if (e.loadedPlayer == null) {
+        final data = (await e.player?.get())?.data();
+        players.addAll([e.copyWith(loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data))]);
+      }
+    }
+
+    return gameModel.copyWith(players: players);
   }
 
   //GENERATE GAME CODE
@@ -131,7 +143,17 @@ class LobbyController {
       }, SetOptions(merge: true));
     }
 
-    return GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+    GameModel gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+    List<PlayerMatchModel> players = [];
+
+    for (final e in gameModel.players) {
+      if (e.loadedPlayer == null) {
+        final data = (await e.player?.get())?.data();
+        players.addAll([e.copyWith(loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data))]);
+      }
+    }
+
+    return gameModel.copyWith(players: players);
   }
 
   //LEAVE GAME
