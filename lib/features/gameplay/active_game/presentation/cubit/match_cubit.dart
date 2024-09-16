@@ -29,7 +29,7 @@ class MatchCubit extends Cubit<GameModel?> {
       }
     }
 
-    await matchesCollection.doc(gameModel.code).update({
+    Map<Object, Object?> updateDetails = {
       'draw_deck': deck.toMapList(),
       'discard_deck': [],
       'players': gameModel.players.map(
@@ -37,7 +37,13 @@ class MatchCubit extends Cubit<GameModel?> {
           return e.toMap();
         },
       ).toList(),
-    });
+    };
+
+    if (isHost(hostId: gameModel.hostId)) {
+      updateDetails.addAll({'turn_start_time': DateTime.now().add(const Duration(seconds: 5))});
+    }
+
+    await matchesCollection.doc(gameModel.code).update(updateDetails);
 
     List<PlayerMatchModel> players = [];
 
@@ -51,10 +57,12 @@ class MatchCubit extends Cubit<GameModel?> {
     emit(GameModel.fromMap((await matchesCollection.doc(gameModel.code).get()).data() ?? {}).copyWith(players: players));
   }
 
-  bool isHost({String? uid}) {
-    if (state?.hostId == null) return false;
-    if (state!.hostId.isEmpty) return false;
-    return state!.hostId == (uid ?? FirebaseAuth.instance.currentUser?.uid);
+  bool isHost({String? hostId, String? uid}) {
+    if (state?.hostId == null) {
+      if (hostId == null) return false;
+    }
+
+    return (hostId ?? state!.hostId) == (uid ?? FirebaseAuth.instance.currentUser?.uid);
   }
 
   //DELETE GAME

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:five_minus/features/gameplay/model/deck_model.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
@@ -51,9 +52,7 @@ class GameModel {
         discardDeck: data['discard_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['discard_deck']),
         turn: data['turn'],
         drawnCard: data['drawn_card'] == null ? null : CardModel.fromMap(data['drawn_card']),
-        turnStartTime: DateTime.tryParse(
-          data['turn_start_time'] ?? '',
-        ),
+        turnStartTime: data['turn_start_time'] is! Timestamp ? null : (data['turn_start_time'] as Timestamp).toDate(),
         powerStartTime: DateTime.tryParse(
           data['power_start_time'] ?? '',
         ),

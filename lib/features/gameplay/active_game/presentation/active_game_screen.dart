@@ -13,6 +13,7 @@ import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
 import 'active_game_controller.dart';
 import 'widgets/discard_pile_widget.dart';
+import 'widgets/game_overlay.dart';
 import 'widgets/player_hands_widget.dart';
 
 class ActiveGameScreen extends StatefulWidget {
@@ -96,111 +97,116 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                 color: Colors.white,
               ),
             )
-          : SizedBox(
-              width: double.infinity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Expanded(
-                    child: SizedBox(),
-                    // child: PlayerHands(
-                    //   playerIndex: 1,
-                    // ),
-                  ),
-                  const SizedBox(
-                    height: 12,
-                  ),
-                  Expanded(
-                    child: SizedBox(
-                      width: MediaQuery.sizeOf(context).width * 0.4,
-                      child: Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            //Draw Deck
-                            Expanded(
-                              child: (matchCubit.state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
-                                  ? InkWell(
-                                      onTap: () {
-                                        matchCubit.drawCard();
-                                      },
-                                      child: UnconstrainedBox(
-                                        child: SizedBox(
-                                          height: 80,
-                                          child: Image.asset(
-                                            AssetPath.drawDeck5Plus,
-                                            fit: BoxFit.contain,
+          : Stack(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                        child: SizedBox(),
+                        // child: PlayerHands(
+                        //   playerIndex: 1,
+                        // ),
+                      ),
+                      const SizedBox(
+                        height: 12,
+                      ),
+                      Expanded(
+                        child: SizedBox(
+                          width: MediaQuery.sizeOf(context).width * 0.4,
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                //Draw Deck
+                                Expanded(
+                                  child: (matchCubit.state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                                      ? InkWell(
+                                          onTap: () {
+                                            matchCubit.drawCard();
+                                          },
+                                          child: UnconstrainedBox(
+                                            child: SizedBox(
+                                              height: 80,
+                                              child: Image.asset(
+                                                AssetPath.drawDeck5Plus,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                    )
-                                  : const SizedBox.expand(),
+                                        )
+                                      : const SizedBox.expand(),
+                                ),
+                                //Drawn Card
+                                BlocBuilder<MatchCubit, GameModel?>(
+                                  builder: (context, state) {
+                                    return Expanded(
+                                      child: (state?.drawnCard != null) ? FrontCard(cardModel: state!.drawnCard!) : const SizedBox.expand(),
+                                    );
+                                  },
+                                ),
+                                //Discard pile
+                                const Expanded(
+                                  flex: 2,
+                                  child: DiscardPile(),
+                                ),
+                              ],
                             ),
-                            //Drawn Card
-                            BlocBuilder<MatchCubit, GameModel?>(
-                              builder: (context, state) {
-                                return Expanded(
-                                  child: (state?.drawnCard != null) ? FrontCard(cardModel: state!.drawnCard!) : const SizedBox.expand(),
-                                );
-                              },
-                            ),
-                            //Discard pile
-                            const Expanded(
-                              flex: 2,
-                              child: DiscardPile(),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 12,
-                  ),
-                  Expanded(
-                    child: userIndex != null
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Flexible(child: ElevatedButton(onPressed: () {}, child: const Text('Challenge'))),
-                              Expanded(
-                                flex: 2,
-                                child: Align(
-                                  alignment: Alignment.center,
-                                  child: PlayerHands(
-                                    playerIndex: userIndex!,
-                                  ),
-                                ),
-                              ),
-                              Flexible(
-                                child: Stack(
-                                  children: [
-                                    ClipOval(
-                                        child: Image.memory(
-                                      base64Decode(matchCubit.state?.players[userIndex!].loadedPlayer?.icon ?? ''),
-                                      width: 60,
-                                      height: 60,
-                                      gaplessPlayback: true,
-                                    )),
-                                    const SizedBox(
-                                      height: 60,
-                                      width: 60,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.lightGreen,
-                                        value: 0.2,
+                      const SizedBox(
+                        height: 12,
+                      ),
+                      Expanded(
+                        child: userIndex != null
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Flexible(child: ElevatedButton(onPressed: () {}, child: const Text('Challenge'))),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Align(
+                                      alignment: Alignment.center,
+                                      child: PlayerHands(
+                                        playerIndex: userIndex!,
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          )
-                        : const SizedBox.expand(),
-                  )
-                ],
-              ),
+                                  ),
+                                  Flexible(
+                                    child: Stack(
+                                      children: [
+                                        ClipOval(
+                                            child: Image.memory(
+                                          base64Decode(matchCubit.state?.players[userIndex!].loadedPlayer?.icon ?? ''),
+                                          width: 60,
+                                          height: 60,
+                                          gaplessPlayback: true,
+                                        )),
+                                        const SizedBox(
+                                          height: 60,
+                                          width: 60,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.lightGreen,
+                                            value: 0.2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.expand(),
+                      )
+                    ],
+                  ),
+                ),
+                const Positioned.fill(child: GameOverlay())
+              ],
             ),
     );
   }
