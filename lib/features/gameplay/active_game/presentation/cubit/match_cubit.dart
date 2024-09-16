@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../auth_game_services/model/firebase_user_model.dart';
 import '../../../model/card_model.dart';
 import '../../../model/deck_model.dart';
+import '../../../model/player_match_model.dart';
 
 class MatchCubit extends Cubit<GameModel?> {
   MatchCubit() : super(null);
@@ -37,7 +39,16 @@ class MatchCubit extends Cubit<GameModel?> {
       ).toList(),
     });
 
-    emit(GameModel.fromMap((await matchesCollection.doc(gameModel.code).get()).data() ?? {}));
+    List<PlayerMatchModel> players = [];
+
+    for (final e in gameModel.players) {
+      if (e.loadedPlayer == null) {
+        final data = (await e.player?.get())?.data();
+        players.addAll([e.copyWith(loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data))]);
+      }
+    }
+
+    emit(GameModel.fromMap((await matchesCollection.doc(gameModel.code).get()).data() ?? {}).copyWith(players: players));
   }
 
   bool isHost({String? uid}) {
@@ -75,7 +86,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
   bool updateFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) {
     if (event.data() != null) {
-      emit(GameModel.fromMap(event.data()!));
+      emit(GameModel.fromMap(event.data()!).copyWith(players: state?.players));
       return true;
     }
     return false;
@@ -87,7 +98,7 @@ class MatchCubit extends Cubit<GameModel?> {
     CardModel? cardDiscarded = gameModel?.players[playerIndex].playerHand?.removeAt(cardIndex);
     if (cardDiscarded != null) gameModel?.discardDeck?.cardDeck?.add(cardDiscarded);
 
-    emit(gameModel);
+    emit(gameModel?.copyWith(players: state?.players));
 
     await matchesCollection.doc(gameModel?.code).update({
       'discard_deck': gameModel?.discardDeck?.toMapList(),
@@ -104,7 +115,7 @@ class MatchCubit extends Cubit<GameModel?> {
     GameModel? gameModel = state?.copyWith();
     CardModel? cardDiscarded = gameModel?.drawDeck?.getCardFromDeck();
 
-    emit(gameModel?.copyWith(drawnCard: cardDiscarded));
+    emit(gameModel?.copyWith(drawnCard: cardDiscarded).copyWith(players: state?.players));
 
     await matchesCollection.doc(gameModel?.code).update({
       'draw_deck': gameModel?.drawDeck?.toMapList(),

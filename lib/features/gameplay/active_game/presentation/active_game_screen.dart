@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/widgets/front_card_widget.dart';
@@ -160,8 +161,41 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                   ),
                   Expanded(
                     child: userIndex != null
-                        ? PlayerHands(
-                            playerIndex: userIndex!,
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(child: ElevatedButton(onPressed: () {}, child: const Text('Challenge'))),
+                              Expanded(
+                                flex: 2,
+                                child: Align(
+                                  alignment: Alignment.center,
+                                  child: PlayerHands(
+                                    playerIndex: userIndex!,
+                                  ),
+                                ),
+                              ),
+                              Flexible(
+                                child: Stack(
+                                  children: [
+                                    ClipOval(
+                                        child: Image.memory(
+                                      base64Decode(matchCubit.state?.players[userIndex!].loadedPlayer?.icon ?? ''),
+                                      width: 60,
+                                      height: 60,
+                                      gaplessPlayback: true,
+                                    )),
+                                    const SizedBox(
+                                      height: 60,
+                                      width: 60,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.lightGreen,
+                                        value: 0.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           )
                         : const SizedBox.expand(),
                   )

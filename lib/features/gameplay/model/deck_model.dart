@@ -7,14 +7,13 @@ import '../enums/enum_card_suit.dart';
 import 'card_model.dart';
 
 class Deck extends Equatable {
-  List<CardModel>? cardDeck;
+  final List<CardModel>? cardDeck;
 
-  Deck({this.cardDeck, bool generateNewRandomDeck = false}) {
-    if (generateNewRandomDeck) {
-      cardDeck = createRandomDeck();
-    }
-    cardDeck ??= createRandomDeck();
-  }
+  Deck({
+    bool generateNewRandomDeck = false,
+    List<CardModel>? list,
+  }) : cardDeck = generateNewRandomDeck ? createRandomDeck() : list ?? [];
+
   // Function to create a standard deck of cards
   static List<CardModel> createRandomDeck() {
     // Define the suits and ranks
@@ -69,7 +68,7 @@ class Deck extends Equatable {
     for (final item in responseList) {
       resultList.add(CardModel.fromMap(item));
     }
-    return Deck(cardDeck: resultList);
+    return Deck(list: resultList);
   }
 
   String toJson() => json.encode(toMapList());
