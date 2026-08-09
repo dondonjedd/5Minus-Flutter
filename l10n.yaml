@@ -1,3 +1,4 @@
 arb-dir: asset/language/
 template-arb-file: language_en.arb
 output-localization-file: app_localization.dart
+output-dir: lib/l10n

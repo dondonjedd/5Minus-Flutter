@@ -1,0 +1,62 @@
+---
+description: Enforces a lean 3-layer architecture (Presentation, Domain, Data) with a Core folder, using fpdart for functional error handling and manual data classes.
+globs: lib/**/*.dart
+alwaysApply: false
+---
+
+# Lean Clean Architecture Standards
+
+You must adhere to this architectural structure for all feature development and refactoring.
+
+## 1. Core Layer (`lib/core/`)
+- **Purpose**: Shared utilities used across the entire app.
+- **Failures**: Define a base `Failure` class and specific subclasses (e.g., `ServerFailure`, `CacheFailure`) to be used in `Either` returns.
+- **Network**: Shared `http.Client` configurations or wrappers. **DO NOT use Dio.**
+- **Common UI**: Reusable base widgets and theme constants.
+
+## 2. Feature Structure (`lib/features/{feature_name}/`)
+
+### Domain Layer (The Hub)
+- **Models**: Manual Dart classes only.
+    - **STRICT**: No `freezed` or `json_serializable`.
+    - **MUST**: Include manual `factory fromJson(Map<String, dynamic> json)` and `Map<String, dynamic> toJson()` methods.
+- **Logic/Services**: Coordinates business rules and data flow.
+    - **Return Type**: MUST return `Either<Failure, T>` from the `fpdart` package.
+    - **Error Handling**: Use `try-catch` to intercept Data Layer exceptions and map them to `Left(Failure)`.
+- **Constraint**: Pure Dart only. No imports from `flutter/` or state management libraries.
+
+### Data Layer (The Infrastructure)
+- **Constraint**: Use the standard `http` package for all remote calls.
+- **DataSources**: Low-level API or Local DB calls wrapped in `try-catch`.
+- **Repositories**: Implemented here to fetch raw data and return models to the Domain.
+
+### Presentation Layer (The UI)
+- **Placement**: All State Management (Cubits/ValueNotifiers) MUST live here.
+- **Local State**: Use **ValueNotifier** for single-page logic or simple UI toggles to avoid unnecessary rebuilds.
+- **Global State**: Use **Cubit** (from `flutter_bloc`) when state needs to persist across multiple pages or handle complex logic.
+- **Consumption**: Use `.fold()` on Domain `Either` results to update UI states.
+
+## Dependency Rules
+1. **Presentation** depends on **Domain**.
+2. **Data** depends on **Domain**.
+3. **Domain** depends on **nothing** (except `core` and `fpdart`).
+4. **Core** is accessible by all layers.
+
+## Folder Template
+lib/
+├── core/
+│   ├── errors/
+│   ├── network/
+│   └── widgets/
+└── features/
+    └── {feature_name}/
+        ├── data/
+        │   ├── data_sources/
+        │   └── repositories/
+        ├── domain/
+        │   ├── logic/
+        │   └── models/
+        └── presentation/
+            ├── cubit/
+            ├── pages/
+            └── widgets/

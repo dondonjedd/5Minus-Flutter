@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/data/configuration_data.dart';
 import '../../../../auth_game_services/model/firebase_user_model.dart';
 import '../../../model/card_model.dart';
 import '../../../model/deck_model.dart';
@@ -37,10 +38,11 @@ class MatchCubit extends Cubit<GameModel?> {
           return e.toMap();
         },
       ).toList(),
+      'turn': 0,
     };
 
     if (isHost(hostId: gameModel.hostId)) {
-      updateDetails.addAll({'turn_start_time': DateTime.now().add(const Duration(seconds: 5))});
+      updateDetails.addAll({'turn_start_time': DateTime.now().add(Duration(milliseconds: ConfigurationData.turnDuration))});
     }
 
     await matchesCollection.doc(gameModel.code).update(updateDetails);
@@ -69,6 +71,25 @@ class MatchCubit extends Cubit<GameModel?> {
   deleteGame() async {
     if (state?.code.isEmpty ?? true) return;
     await matchesCollection.doc(state?.code).delete();
+  }
+
+  setGameToActive() async {
+    if (state?.code == null) return;
+    emit(state?.copyWith(isActive: true));
+    await FirebaseFirestore.instance.collection('matches').doc(state?.code).update({'is_active': true});
+  }
+
+  startNextTurn() async {
+    int newTurn = state?.turn == 1 ? 0 : 1;
+    DateTime? newTime = state?.turnStartTime?.add(Duration(milliseconds: ConfigurationData.turnDuration));
+    await FirebaseFirestore.instance.collection('matches').doc(state?.code).update({
+      'turn': newTurn,
+      'turn_start_time': Timestamp.fromDate(
+        newTime ?? DateTime.now(),
+      )
+    });
+
+    emit(state?.copyWith(turn: newTurn, turnStartTime: newTime));
   }
 
   //LEAVE GAME

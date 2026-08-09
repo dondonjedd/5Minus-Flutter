@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' hide TextInputStyle;
 
 import 'text_input_factory.dart';
 

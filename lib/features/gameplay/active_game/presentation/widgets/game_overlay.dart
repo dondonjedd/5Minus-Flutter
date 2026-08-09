@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -22,6 +23,7 @@ class _GameOverlayState extends State<GameOverlay> {
 
   @override
   void dispose() {
+    timer?.cancel();
     super.dispose();
   }
 
@@ -31,7 +33,7 @@ class _GameOverlayState extends State<GameOverlay> {
       (_) {
         MatchCubit matchCubit = context.read<MatchCubit>();
 
-        if (matchCubit.state?.turnStartTime != null) {
+        if (matchCubit.state?.turnStartTime != null && timer == null && !(matchCubit.state?.isActive ?? false)) {
           timer = Timer.periodic(
             const Duration(seconds: 1),
             (timer) {
@@ -41,6 +43,7 @@ class _GameOverlayState extends State<GameOverlay> {
               if ((now.isAfter(matchCubit.state!.turnStartTime!)) || ((countdownText ?? 0) <= 0)) {
                 countdownText = null;
                 timer.cancel();
+                matchCubit.setGameToActive();
               }
               setState(() {});
             },
@@ -62,7 +65,7 @@ class _GameOverlayState extends State<GameOverlay> {
         return false;
       },
       listener: (context, state) {
-        if (state?.turnStartTime != null && timer == null) {
+        if (state?.turnStartTime != null && timer == null && !(state?.isActive ?? false)) {
           timer = Timer.periodic(
             const Duration(seconds: 1),
             (timer) {

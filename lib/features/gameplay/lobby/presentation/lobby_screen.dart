@@ -94,17 +94,20 @@ class _LobbyScreenState extends State<LobbyScreen> {
           selectedGameType[i] = i == gameModel!.gameType;
         }
       }
-      if (gameModel?.isActive == true) {
+
+      if (gameModel?.hasStarted ?? false) {
+        if (!context.mounted) return;
         widget.controller.navigateActiveGame(context, gameCode: gameModel?.code);
       }
     } else {
       widget.controller.navigateDashboard(context);
     }
+    if (!context.mounted) return;
     setState(() {});
   }
 
   bool canStart() {
-    if ((gameModel?.players.length ?? 0) < 2) return false;
+    // if ((gameModel?.players.length ?? 0) < 2) return false;
     if (!isHost) return false;
     if (gameModel?.players.any(
           (element) {
@@ -353,7 +356,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     onPressed: isHost
                         ? canStart()
                             ? () {
-                                widget.controller.startGame(gameCode: gameModel?.code);
+                                widget.controller.startGame(context, gameCode: gameModel?.code);
                               }
                             : null
                         : () {

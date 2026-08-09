@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/widgets/front_card_widget.dart';
+import 'package:five_minus/features/gameplay/active_game/presentation/widgets/player_timer_widget.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/resource/asset_path.dart';
@@ -105,11 +106,10 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Expanded(
-                        child: SizedBox(),
-                        // child: PlayerHands(
-                        //   playerIndex: 1,
-                        // ),
+                      Expanded(
+                        child: userIndex == null || ((matchCubit.state?.players.length ?? 0) <= 1)
+                            ? const SizedBox.expand()
+                            : Transform.flip(child: PlayerView(userIndex: userIndex == 0 ? 1 : 0, matchCubit: matchCubit)),
                       ),
                       const SizedBox(
                         height: 12,
@@ -163,44 +163,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                         height: 12,
                       ),
                       Expanded(
-                        child: userIndex != null
-                            ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Flexible(child: ElevatedButton(onPressed: () {}, child: const Text('Challenge'))),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Align(
-                                      alignment: Alignment.center,
-                                      child: PlayerHands(
-                                        playerIndex: userIndex!,
-                                      ),
-                                    ),
-                                  ),
-                                  Flexible(
-                                    child: Stack(
-                                      children: [
-                                        ClipOval(
-                                            child: Image.memory(
-                                          base64Decode(matchCubit.state?.players[userIndex!].loadedPlayer?.icon ?? ''),
-                                          width: 60,
-                                          height: 60,
-                                          gaplessPlayback: true,
-                                        )),
-                                        const SizedBox(
-                                          height: 60,
-                                          width: 60,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.lightGreen,
-                                            value: 0.2,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.expand(),
+                        child: userIndex == null ? const SizedBox.expand() : PlayerView(userIndex: userIndex, matchCubit: matchCubit),
                       )
                     ],
                   ),
@@ -208,6 +171,55 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                 const Positioned.fill(child: GameOverlay())
               ],
             ),
+    );
+  }
+}
+
+class PlayerView extends StatelessWidget {
+  const PlayerView({
+    super.key,
+    required this.userIndex,
+    required this.matchCubit,
+  });
+
+  final int? userIndex;
+  final MatchCubit matchCubit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.center,
+            child: ElevatedButton(onPressed: () {}, child: const Text('Challenge')),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Align(
+            alignment: Alignment.center,
+            child: PlayerHands(
+              playerIndex: userIndex!,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              ClipOval(
+                  child: Image.memory(
+                base64Decode(matchCubit.state?.players[userIndex!].loadedPlayer?.icon ?? ''),
+                width: 60,
+                height: 60,
+                gaplessPlayback: true,
+              )),
+              PlayerTimer(userIndex: userIndex),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

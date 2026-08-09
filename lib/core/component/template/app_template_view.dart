@@ -137,7 +137,7 @@ class _AppTemplateViewState extends State<AppTemplateView> with WidgetsBindingOb
           surface: ColorVariableData.light.surface,
           onSurface: ColorVariableData.light.onSurface,
         ),
-        dialogTheme: const DialogTheme(titleTextStyle: TextStyle(color: Colors.black)),
+        dialogTheme: const DialogThemeData(titleTextStyle: TextStyle(color: Colors.black)),
         radioTheme: RadioThemeData(
           fillColor: WidgetStateProperty.all(ColorVariableData.light.primary),
         ),

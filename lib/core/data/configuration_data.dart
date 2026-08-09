@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:flutter_gen/gen_l10n/app_localization.dart';
+import 'package:five_minus/l10n/app_localization.dart';
 
 class ConfigurationData {
   static const localizationDelegateList = AppLocalizations.localizationsDelegates;
@@ -24,4 +24,7 @@ class ConfigurationData {
   static const String androidLeaderboardId = 'CgkI9biKpJYCEAIQAQ';
 
   const ConfigurationData._();
+
+  //milliseconds
+  static int turnDuration = 5000;
 }

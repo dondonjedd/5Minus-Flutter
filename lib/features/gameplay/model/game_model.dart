@@ -12,6 +12,7 @@ class GameModel {
   final List<PlayerMatchModel> players;
   final int? gameType;
   final bool isActive;
+  final bool hasStarted;
   final Deck? drawDeck;
   final Deck? discardDeck;
   final int? turn;
@@ -27,6 +28,7 @@ class GameModel {
     required this.players,
     required this.gameType,
     required this.isActive,
+    required this.hasStarted,
     this.drawDeck,
     this.discardDeck,
     this.turn,
@@ -48,6 +50,7 @@ class GameModel {
             [],
         gameType: data['game_type'] as int?,
         isActive: (data['is_active'] as bool?) ?? false,
+        hasStarted: (data['has_started'] as bool?) ?? false,
         drawDeck: data['draw_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['draw_deck']),
         discardDeck: data['discard_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['discard_deck']),
         turn: data['turn'],
@@ -70,6 +73,7 @@ class GameModel {
         ).toList(),
         'game_type': gameType,
         'is_active': isActive,
+        'has_started': hasStarted,
         'draw_deck': drawDeck?.toMapList(),
         'discard_deck': discardDeck?.toMapList(),
         'turn': turn,
@@ -96,6 +100,7 @@ class GameModel {
     List<PlayerMatchModel>? players,
     int? gameType,
     bool? isActive,
+    bool? hasStarted,
     Deck? drawDeck,
     Deck? discardDeck,
     int? turn,
@@ -111,6 +116,7 @@ class GameModel {
         players: players ?? this.players,
         gameType: gameType ?? this.gameType,
         isActive: isActive ?? this.isActive,
+        hasStarted: hasStarted ?? this.hasStarted,
         drawDeck: drawDeck ?? this.drawDeck,
         discardDeck: discardDeck ?? this.discardDeck,
         turn: turn ?? this.turn,

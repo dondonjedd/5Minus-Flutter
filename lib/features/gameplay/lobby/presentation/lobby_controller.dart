@@ -38,9 +38,13 @@ class LobbyController {
   final userCollection = FirebaseFirestore.instance.collection('users');
 
   //START GAME
-  startGame({required String? gameCode}) async {
+  startGame(BuildContext context, {required String? gameCode}) async {
+    await FirebaseFirestore.instance.collection('matches').doc(gameCode).update({'has_started': true});
+
     if (gameCode == null) return;
-    await FirebaseFirestore.instance.collection('matches').doc(gameCode).update({'is_active': true});
+    if (!context.mounted) return;
+    navigateActiveGame(context, gameCode: gameCode);
+
     return;
   }
 
@@ -71,7 +75,8 @@ class LobbyController {
               code: gameCode,
               players: [PlayerMatchModel(player: userCollection.doc(hostId), isReady: true)],
               gameType: 0,
-              isActive: false)
+              isActive: false,
+              hasStarted: false)
           .toMap());
     }
 
