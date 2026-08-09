@@ -1,11 +1,10 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../dashboard/presentation/dashboard_controller.dart';
 import 'active_game_screen.dart';
 
@@ -24,23 +23,32 @@ class ActiveGameController {
   }
 
   ActiveGameController._();
-  final matchesCollection = FirebaseFirestore.instance.collection('matches');
 
-  StreamSubscription? listenToChanges(BuildContext context) {
-    bool isGameExist = true;
+  RealtimeChannel? listenToChanges(BuildContext context) {
     MatchCubit matchCubit = context.read<MatchCubit>();
+    final code = matchCubit.state?.code;
+    if (code == null) return null;
 
-    if (matchCubit.state?.code != null) {
-      return FirebaseFirestore.instance.collection('matches').doc(matchCubit.state?.code).snapshots().listen(
-        (event) {
-          isGameExist = matchCubit.updateFromFirestore(event);
-          if (!isGameExist) {
-            if (context.mounted) navigateDashboard(context);
-          }
-        },
-      );
-    }
-    return null;
+    return SupabaseService.client.channel('active-match:$code').onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'matches',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'game_code',
+        value: code,
+      ),
+      callback: (payload) {
+        final deleted = payload.eventType == PostgresChangeEvent.delete;
+        final isGameExist = matchCubit.updateFromSupabase(
+          deleted ? null : Map<String, dynamic>.from(payload.newRecord),
+          deleted: deleted,
+        );
+        if (!isGameExist) {
+          if (context.mounted) navigateDashboard(context);
+        }
+      },
+    ).subscribe();
   }
 
   navigateDashboard(BuildContext context) {

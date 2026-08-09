@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/core/component/template/authentication/model/user_model.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -38,15 +38,13 @@ class AuthNetworkDatasource {
 
   Future<UserModel?> getUserModel() async {
     try {
-      final userCollection = _getUserCollection();
-      if (userCollection == null) return null;
-      final result = await userCollection.get();
-      if (result.data()?.isEmpty ?? true) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return null;
+      final data = await SupabaseService.client.from('users').select().eq('id', uid).maybeSingle();
+      if (data == null) {
         return _createUser();
       }
-      return UserModel.fromMap(result.data());
-    } on FirebaseException catch (e) {
-      throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
+      return UserModel.fromMap(Map<String, dynamic>.from(data));
     } catch (e) {
       throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }
@@ -55,13 +53,18 @@ class AuthNetworkDatasource {
   Future<UserModel?> updateUser(UserModel? usermodel) async {
     try {
       if (usermodel == null) return null;
-      final userCollection = _getUserCollection();
-      if (userCollection == null) return null;
-      await userCollection.set(usermodel.toMap());
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return null;
+      await SupabaseService.client.from('users').upsert(
+            {
+              'id': uid,
+              'player_id': uid,
+              ...usermodel.toSupabaseMap(),
+            },
+            onConflict: 'id',
+          );
 
       return getUserModel();
-    } on FirebaseException catch (e) {
-      throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
     } catch (e) {
       throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }
@@ -92,22 +95,18 @@ class AuthNetworkDatasource {
 
   Future<UserModel?> signInGoogle() async {
     try {
-      // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
 
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth?.accessToken,
         idToken: googleAuth?.idToken,
       );
 
-      // Once signed in, return the UserCredential
       UserCredential user = await FirebaseAuth.instance.signInWithCredential(credential);
 
-      await GoogleSignIn().signOut(); // <-- add this code here
+      await GoogleSignIn().signOut();
       if (user.additionalUserInfo?.isNewUser ?? false) return await _createUser();
       return await getUserModel();
     } on FirebaseAuthException catch (e) {
@@ -119,22 +118,25 @@ class AuthNetworkDatasource {
 
   Future<UserModel?> _createUser() async {
     try {
-      final userCollection = _getUserCollection();
-      if (userCollection == null) return null;
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return null;
 
-      await userCollection.set(UserModel.baseUserModel().toMap());
-      return UserModel.fromMap((await userCollection.get()).data());
+      final base = UserModel.baseUserModel();
+      await SupabaseService.client.from('users').upsert(
+            {
+              'id': uid,
+              'player_id': uid,
+              ...base.toSupabaseMap(),
+            },
+            onConflict: 'id',
+          );
+      final data = await SupabaseService.client.from('users').select().eq('id', uid).maybeSingle();
+      return UserModel.fromMap(data == null ? null : Map<String, dynamic>.from(data));
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
     } catch (e) {
       throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }
-  }
-
-  DocumentReference<Map<String, dynamic>>? _getUserCollection() {
-    String? uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return null;
-    return FirebaseFirestore.instance.collection("users").doc(uid);
   }
 
   Future<bool> networkCall({

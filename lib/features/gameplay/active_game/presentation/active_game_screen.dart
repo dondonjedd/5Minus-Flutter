@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
@@ -9,6 +8,7 @@ import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
@@ -29,12 +29,12 @@ class ActiveGameScreen extends StatefulWidget {
 class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool isLoading = false;
   bool isHost = false;
-  StreamSubscription? _gameStreamSubscription;
+  RealtimeChannel? _gameChannel;
   int? userIndex;
 
   @override
   void dispose() {
-    _gameStreamSubscription?.cancel();
+    _gameChannel?.unsubscribe();
     super.dispose();
   }
 
@@ -54,7 +54,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
 
         //LISTEN CHANGES
         if (!context.mounted) return;
-        _gameStreamSubscription = widget.controller.listenToChanges(context);
+        _gameChannel = widget.controller.listenToChanges(context);
         userIndex = matchCubit.getUserIndex();
         setState(() {
           isLoading = false;

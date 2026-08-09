@@ -1,7 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../../core/data/configuration_data.dart';
 import '../../../../auth_game_services/model/firebase_user_model.dart';
@@ -11,52 +12,44 @@ import '../../../model/player_match_model.dart';
 
 class MatchCubit extends Cubit<GameModel?> {
   MatchCubit() : super(null);
-  final matchesCollection = FirebaseFirestore.instance.collection('matches');
+
+  SupabaseClient get _client => SupabaseService.client;
 
   initalize(String? gameCode) async {
     if (gameCode == null) return null;
 
-    GameModel? gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
+    final row = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    GameModel? gameModel = GameModel.fromMap(Map<String, dynamic>.from(row ?? {}));
 
     Deck deck = Deck(generateNewRandomDeck: true);
 
-    while (gameModel.players.any(
-      (element) {
-        return element.playerHand?.length != 4;
-      },
-    )) {
-      for (var player in gameModel.players) {
-        player.playerHand?.add(deck.getCardFromDeck());
+    final dealtPlayers = gameModel.players.map((player) {
+      final hand = List<CardModel>.from(player.playerHand ?? const []);
+      while (hand.length < 4) {
+        hand.add(deck.getCardFromDeck());
       }
-    }
+      return player.copyWith(playerHand: hand);
+    }).toList();
+    gameModel = gameModel.copyWith(players: dealtPlayers);
 
-    Map<Object, Object?> updateDetails = {
+    final Map<String, dynamic> updateDetails = {
       'draw_deck': deck.toMapList(),
       'discard_deck': [],
-      'players': gameModel.players.map(
-        (e) {
-          return e.toMap();
-        },
-      ).toList(),
+      'players': gameModel.players.map((e) => e.toMap()).toList(),
       'turn': 0,
     };
 
     if (isHost(hostId: gameModel.hostId)) {
-      updateDetails.addAll({'turn_start_time': DateTime.now().add(Duration(milliseconds: ConfigurationData.turnDuration))});
+      updateDetails['turn_start_time'] =
+          DateTime.now().add(Duration(milliseconds: ConfigurationData.turnDuration)).toIso8601String();
     }
 
-    await matchesCollection.doc(gameModel.code).update(updateDetails);
+    await _client.from('matches').update(updateDetails).eq('game_code', gameModel.code);
 
-    List<PlayerMatchModel> players = [];
+    final List<PlayerMatchModel> players = await _loadPlayers(gameModel.players);
 
-    for (final e in gameModel.players) {
-      if (e.loadedPlayer == null) {
-        final data = (await e.player?.get())?.data();
-        players.addAll([e.copyWith(loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data))]);
-      }
-    }
-
-    emit(GameModel.fromMap((await matchesCollection.doc(gameModel.code).get()).data() ?? {}).copyWith(players: players));
+    final refreshed = await _client.from('matches').select().eq('game_code', gameModel.code).maybeSingle();
+    emit(GameModel.fromMap(Map<String, dynamic>.from(refreshed ?? {})).copyWith(players: players));
   }
 
   bool isHost({String? hostId, String? uid}) {
@@ -70,24 +63,23 @@ class MatchCubit extends Cubit<GameModel?> {
   //DELETE GAME
   deleteGame() async {
     if (state?.code.isEmpty ?? true) return;
-    await matchesCollection.doc(state?.code).delete();
+    await _client.from('matches').delete().eq('game_code', state!.code);
   }
 
   setGameToActive() async {
     if (state?.code == null) return;
     emit(state?.copyWith(isActive: true));
-    await FirebaseFirestore.instance.collection('matches').doc(state?.code).update({'is_active': true});
+    await _client.from('matches').update({'is_active': true}).eq('game_code', state!.code);
   }
 
   startNextTurn() async {
+    if (state?.code == null) return;
     int newTurn = state?.turn == 1 ? 0 : 1;
     DateTime? newTime = state?.turnStartTime?.add(Duration(milliseconds: ConfigurationData.turnDuration));
-    await FirebaseFirestore.instance.collection('matches').doc(state?.code).update({
+    await _client.from('matches').update({
       'turn': newTurn,
-      'turn_start_time': Timestamp.fromDate(
-        newTime ?? DateTime.now(),
-      )
-    });
+      'turn_start_time': (newTime ?? DateTime.now()).toIso8601String(),
+    }).eq('game_code', state!.code);
 
     emit(state?.copyWith(turn: newTurn, turnStartTime: newTime));
   }
@@ -99,26 +91,22 @@ class MatchCubit extends Cubit<GameModel?> {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     state?.players.removeWhere(
       (element) {
-        return element.player?.id == userId;
+        return element.playerId == userId;
       },
     );
     if (userId != null) {
-      await matchesCollection.doc(state?.code).set({
-        'players': state?.players.map(
-          (e) {
-            return e.toMap();
-          },
-        ).toList()
-      }, SetOptions(merge: true));
+      await _client.from('matches').update({
+        'players': state?.players.map((e) => e.toMap()).toList(),
+      }).eq('game_code', state!.code);
     }
   }
 
-  bool updateFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) {
-    if (event.data() != null) {
-      emit(GameModel.fromMap(event.data()!).copyWith(players: state?.players));
-      return true;
+  bool updateFromSupabase(Map<String, dynamic>? data, {required bool deleted}) {
+    if (deleted || data == null) {
+      return false;
     }
-    return false;
+    emit(GameModel.fromMap(data).copyWith(players: state?.players));
+    return true;
   }
 
   //Discard Card
@@ -129,14 +117,10 @@ class MatchCubit extends Cubit<GameModel?> {
 
     emit(gameModel?.copyWith(players: state?.players));
 
-    await matchesCollection.doc(gameModel?.code).update({
+    await _client.from('matches').update({
       'discard_deck': gameModel?.discardDeck?.toMapList(),
-      'players': gameModel?.players.map(
-        (e) {
-          return e.toMap();
-        },
-      ).toList(),
-    });
+      'players': gameModel?.players.map((e) => e.toMap()).toList(),
+    }).eq('game_code', gameModel!.code);
   }
 
   //Draw Card
@@ -146,10 +130,10 @@ class MatchCubit extends Cubit<GameModel?> {
 
     emit(gameModel?.copyWith(drawnCard: cardDiscarded).copyWith(players: state?.players));
 
-    await matchesCollection.doc(gameModel?.code).update({
+    await _client.from('matches').update({
       'draw_deck': gameModel?.drawDeck?.toMapList(),
       'drawn_card': cardDiscarded?.toMap(),
-    });
+    }).eq('game_code', gameModel!.code);
   }
 
   int? getUserIndex() {
@@ -157,7 +141,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
     final userIndex = state?.players.indexWhere(
       (element) {
-        return (element.player?.id == uid);
+        return (element.playerId == uid);
       },
     );
 
@@ -165,5 +149,22 @@ class MatchCubit extends Cubit<GameModel?> {
       return null;
     }
     return userIndex;
+  }
+
+  Future<List<PlayerMatchModel>> _loadPlayers(List<PlayerMatchModel> players) async {
+    final List<PlayerMatchModel> loaded = [];
+    for (final e in players) {
+      if (e.loadedPlayer != null || e.playerId == null) {
+        loaded.add(e);
+        continue;
+      }
+      final data = await _client.from('users').select().eq('id', e.playerId!).maybeSingle();
+      loaded.add(
+        e.copyWith(
+          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(data)),
+        ),
+      );
+    }
+    return loaded;
   }
 }

@@ -29,6 +29,14 @@ class UserModel {
         'points': points,
       };
 
+  /// Columns that exist on the Supabase `users` table (no `rank`).
+  Map<String, dynamic> toSupabaseMap() => {
+        'username': username ?? '',
+        'wins': wins,
+        'loss': loss,
+        'points': points,
+      };
+
   /// `dart:convert`
   ///
   /// Parses the string and returns the resulting Json object as [UserModel].

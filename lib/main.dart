@@ -1,7 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:five_minus/core/component/template/app_template_view.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/core/utility/key_value_utility.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
 import 'package:five_minus/firebase_options.dart';
@@ -20,9 +20,7 @@ void main() async {
 
   await KeyValueUtility().initialise();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-  );
+  await SupabaseService.initialize();
 
   // FlutterError.onError = (errorDetails) {
   //   FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);

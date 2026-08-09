@@ -45,3 +45,8 @@ app.*.map.json
 /android/app/release
 lib/firebase_options.dart
 pubspec.lock
+
+# Local secrets
+.env
+.env.*
+!.env.example

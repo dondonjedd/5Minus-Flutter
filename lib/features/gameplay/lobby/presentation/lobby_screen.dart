@@ -1,13 +1,13 @@
-import 'dart:async';
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collection/collection.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/lobby_params.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
@@ -26,10 +26,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
   bool isLoading = false;
   GameModel? gameModel;
   bool isHost = false;
-  StreamSubscription? _gameStreamSubscription;
+  RealtimeChannel? _gameChannel;
   @override
   void dispose() {
-    _gameStreamSubscription?.cancel();
+    _gameChannel?.unsubscribe();
     super.dispose();
   }
 
@@ -53,7 +53,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         if (gameModel?.hostId != null) isHost = widget.controller.isHost(hostId: gameModel!.hostId);
 
         //LISTEN CHANGES
-        _gameStreamSubscription = widget.controller.listenToChanges(gameModel, _updateLocalFromFirestore);
+        _gameChannel = widget.controller.listenToChanges(gameModel, _updateLocalFromSupabase);
 
         setState(() {
           isLoading = false;
@@ -64,43 +64,45 @@ class _LobbyScreenState extends State<LobbyScreen> {
     super.initState();
   }
 
-  void _updateLocalFromFirestore(DocumentSnapshot<Map<String, dynamic>> event) async {
-    if (event.data() != null) {
-      GameModel tempGameModel = GameModel.fromMap(event.data()!);
-
-      List<PlayerMatchModel> tmpList = [];
-
-      for (PlayerMatchModel element in tempGameModel.players) {
-        // Find the matching element from gameModelPlayers
-        PlayerMatchModel? matchingElement = gameModel?.players.firstWhereOrNull((el2) => el2 == element);
-
-        if (matchingElement != null) {
-          // Add the element from gameModelPlayers
-          tmpList.add(matchingElement);
-        } else {
-          // Load player data if no match found
-          final data = (await element.player?.get())?.data();
-          tmpList.add(
-            element.copyWith(
-              loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data),
-            ),
-          );
-        }
-      }
-
-      gameModel = tempGameModel.copyWith(gameType: tempGameModel.gameType, players: tmpList);
-      if (gameModel?.gameType != null) {
-        for (int i = 0; i < selectedGameType.length; i++) {
-          selectedGameType[i] = i == gameModel!.gameType;
-        }
-      }
-
-      if (gameModel?.hasStarted ?? false) {
-        if (!context.mounted) return;
-        widget.controller.navigateActiveGame(context, gameCode: gameModel?.code);
-      }
-    } else {
+  void _updateLocalFromSupabase(Map<String, dynamic>? data, {required bool deleted}) async {
+    if (deleted || data == null) {
+      if (!context.mounted) return;
       widget.controller.navigateDashboard(context);
+      return;
+    }
+
+    GameModel tempGameModel = GameModel.fromMap(data);
+
+    List<PlayerMatchModel> tmpList = [];
+
+    for (PlayerMatchModel element in tempGameModel.players) {
+      PlayerMatchModel? matchingElement = gameModel?.players.firstWhereOrNull((el2) => el2 == element);
+
+      if (matchingElement != null) {
+        tmpList.add(matchingElement);
+      } else if (element.playerId != null) {
+        final userData =
+            await SupabaseService.client.from('users').select().eq('id', element.playerId!).maybeSingle();
+        tmpList.add(
+          element.copyWith(
+            loadedPlayer: userData == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(userData)),
+          ),
+        );
+      } else {
+        tmpList.add(element);
+      }
+    }
+
+    gameModel = tempGameModel.copyWith(gameType: tempGameModel.gameType, players: tmpList);
+    if (gameModel?.gameType != null) {
+      for (int i = 0; i < selectedGameType.length; i++) {
+        selectedGameType[i] = i == gameModel!.gameType;
+      }
+    }
+
+    if (gameModel?.hasStarted ?? false) {
+      if (!context.mounted) return;
+      widget.controller.navigateActiveGame(context, gameCode: gameModel?.code);
     }
     if (!context.mounted) return;
     setState(() {});

@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/core/data/configuration_data.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:games_services/games_services.dart';
@@ -34,12 +34,13 @@ class AugNetworkDatasource {
 
   Future<FirebaseUserModel?> createFirebaseUser(FirebaseUserModel model) async {
     try {
-      final userCollection = _getUserCollection();
-      if (userCollection == null) return null;
-      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return null;
 
-      await userCollection.doc(uid).set(model.toMap());
+      await SupabaseService.client.from('users').upsert(
+            model.toMap(id: uid),
+            onConflict: 'id',
+          );
       return await getUserModel(uid);
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
@@ -50,13 +51,9 @@ class AugNetworkDatasource {
 
   Future<FirebaseUserModel?> getUserModel(String uid) async {
     try {
-      final userCollection = _getUserCollection();
-      if (userCollection == null) return null;
-      final snapshot = await userCollection.doc(uid).get();
-      if (snapshot.data() == null) return null;
-      return FirebaseUserModel.fromMap(snapshot.data()!);
-    } on FirebaseException catch (e) {
-      throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
+      final data = await SupabaseService.client.from('users').select().eq('id', uid).maybeSingle();
+      if (data == null) return null;
+      return FirebaseUserModel.fromMap(Map<String, dynamic>.from(data));
     } catch (e) {
       throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }
@@ -107,26 +104,12 @@ class AugNetworkDatasource {
     }
   }
 
-  CollectionReference<Map<String, dynamic>>? _getUserCollection() {
-    return FirebaseFirestore.instance.collection("users");
-  }
-
   Future<bool> networkCall({
     required final String param,
     required final String token,
     required final String sessionId,
   }) async {
     try {
-      // final response = await NetworkUtility.post(
-      //     url: '${environment.hostAddress}/blablabla',
-      //     body: {
-      //       'body1': param,
-      //     },
-      //     authenticationToken: token,
-      //     sessionId: sessionId);
-      // if (response.isResponseSuccess) {
-      //   return true;
-      // }
       throw const ServerException(title: 'Login error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     } on ServerException {
       rethrow;

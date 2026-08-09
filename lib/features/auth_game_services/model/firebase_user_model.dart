@@ -19,7 +19,7 @@ class FirebaseUserModel {
 
   factory FirebaseUserModel.fromMap(Map<String, dynamic> data) {
     return FirebaseUserModel(
-      playerId: (data['playerId'] as String?) ?? '-',
+      playerId: (data['player_id'] as String?) ?? (data['playerId'] as String?) ?? (data['id'] as String?) ?? '-',
       username: (data['username'] as String?) ?? '-',
       wins: data['wins'] as int?,
       loss: data['loss'] as int?,
@@ -32,8 +32,9 @@ class FirebaseUserModel {
     return FirebaseUserModel(playerId: '', username: '', wins: 0, loss: 0, points: 0, icon: '');
   }
 
-  Map<String, dynamic> toMap() => {
-        'playerId': playerId,
+  Map<String, dynamic> toMap({String? id}) => {
+        if (id != null) 'id': id,
+        'player_id': playerId ?? id,
         'username': username,
         'wins': wins,
         'loss': loss,

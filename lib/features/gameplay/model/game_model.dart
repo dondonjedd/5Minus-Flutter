@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:five_minus/features/gameplay/model/deck_model.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
@@ -39,12 +38,19 @@ class GameModel {
     this.winner,
   });
 
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   factory GameModel.fromMap(Map<String, dynamic> data) => GameModel(
         hostId: (data['host_id'] as String?) ?? '',
         code: (data['game_code'] as String?) ?? '',
         players: (data['players'] as List<dynamic>?)?.map(
               (e) {
-                return PlayerMatchModel.fromMap(e);
+                return PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map));
               },
             ).toList() ??
             [],
@@ -53,47 +59,39 @@ class GameModel {
         hasStarted: (data['has_started'] as bool?) ?? false,
         drawDeck: data['draw_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['draw_deck']),
         discardDeck: data['discard_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['discard_deck']),
-        turn: data['turn'],
-        drawnCard: data['drawn_card'] == null ? null : CardModel.fromMap(data['drawn_card']),
-        turnStartTime: data['turn_start_time'] is! Timestamp ? null : (data['turn_start_time'] as Timestamp).toDate(),
-        powerStartTime: DateTime.tryParse(
-          data['power_start_time'] ?? '',
-        ),
+        turn: data['turn'] as int?,
+        drawnCard: data['drawn_card'] == null
+            ? null
+            : CardModel.fromMap(Map<String, dynamic>.from(data['drawn_card'] as Map)),
+        turnStartTime: _parseDateTime(data['turn_start_time']),
+        powerStartTime: _parseDateTime(data['power_start_time']),
         isChallengeComplete: (data['is_challenge_complete'] as bool?) ?? false,
-        winner: data['winner'],
+        winner: data['winner'] == null
+            ? null
+            : PlayerMatchModel.fromMap(Map<String, dynamic>.from(data['winner'] as Map)),
       );
 
   Map<String, dynamic> toMap() => {
         'host_id': hostId,
         'game_code': code,
-        'players': players.map(
-          (e) {
-            return e.toMap();
-          },
-        ).toList(),
+        'players': players.map((e) => e.toMap()).toList(),
         'game_type': gameType,
         'is_active': isActive,
         'has_started': hasStarted,
         'draw_deck': drawDeck?.toMapList(),
         'discard_deck': discardDeck?.toMapList(),
         'turn': turn,
-        'drawn_card': drawnCard,
-        'turn_start_time': turnStartTime,
-        'power_start_time': powerStartTime,
+        'drawn_card': drawnCard?.toMap(),
+        'turn_start_time': turnStartTime?.toIso8601String(),
+        'power_start_time': powerStartTime?.toIso8601String(),
         'is_challenge_complete': isChallengeComplete,
-        'winner': winner
+        'winner': winner?.toMap(),
       };
 
-  /// `dart:convert`
-  ///
-  /// Parses the string and returns the resulting Json object as [GameModel].
   factory GameModel.fromJson(String data) {
     return GameModel.fromMap(json.decode(data) as Map<String, dynamic>);
   }
 
-  /// `dart:convert`
-  ///
-  /// Converts [GameModel] to a JSON string.
   String toJson() => json.encode(toMap());
 
   GameModel copyWith({

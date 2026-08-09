@@ -1,8 +1,7 @@
-import 'dart:async';
 import 'dart:math';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/active_game_controller.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
@@ -12,6 +11,7 @@ import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'lobby_screen.dart';
 
@@ -25,6 +25,9 @@ class LobbyController {
   }
 
   LobbyController._();
+
+  SupabaseClient get _client => SupabaseService.client;
+
   bool isHost({required String? hostId, String? uid}) {
     if (hostId == null) return false;
     if (hostId.isEmpty) return false;
@@ -34,14 +37,11 @@ class LobbyController {
   //*******************HOST********************
   String characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
-  final matchesCollection = FirebaseFirestore.instance.collection('matches');
-  final userCollection = FirebaseFirestore.instance.collection('users');
-
   //START GAME
   startGame(BuildContext context, {required String? gameCode}) async {
-    await FirebaseFirestore.instance.collection('matches').doc(gameCode).update({'has_started': true});
-
     if (gameCode == null) return;
+    await _client.from('matches').update({'has_started': true}).eq('game_code', gameCode);
+
     if (!context.mounted) return;
     navigateActiveGame(context, gameCode: gameCode);
 
@@ -52,7 +52,7 @@ class LobbyController {
   deleteGame({required String? gameCode}) async {
     if (gameCode == null) return;
     if (gameCode.isEmpty) return;
-    await matchesCollection.doc(gameCode).delete();
+    await _client.from('matches').delete().eq('game_code', gameCode);
   }
 
   //CREATE GAME
@@ -70,27 +70,20 @@ class LobbyController {
     final hostId = FirebaseAuth.instance.currentUser?.uid;
 
     if (hostId != null) {
-      await matchesCollection.doc(gameCode).set(GameModel(
-              hostId: hostId,
-              code: gameCode,
-              players: [PlayerMatchModel(player: userCollection.doc(hostId), isReady: true)],
-              gameType: 0,
-              isActive: false,
-              hasStarted: false)
-          .toMap());
+      final game = GameModel(
+        hostId: hostId,
+        code: gameCode,
+        players: [PlayerMatchModel(playerId: hostId, isReady: true)],
+        gameType: 0,
+        isActive: false,
+        hasStarted: false,
+      );
+      await _client.from('matches').insert(game.toMap());
     }
 
-    GameModel gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
-    List<PlayerMatchModel> players = [];
-
-    for (final e in gameModel.players) {
-      if (e.loadedPlayer == null) {
-        final data = (await e.player?.get())?.data();
-        players.addAll([e.copyWith(loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data))]);
-      }
-    }
-
-    return gameModel.copyWith(players: players);
+    final data = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(data ?? {}));
+    return gameModel.copyWith(players: await _loadPlayers(gameModel.players));
   }
 
   //GENERATE GAME CODE
@@ -101,13 +94,8 @@ class LobbyController {
 
   //VERIFY IF GAME CODE IS AVAILABLE
   Future<bool> isGameCodeAvailable(String gameCode) async {
-    final res = await matchesCollection.doc(gameCode).get();
-
-    if (res.exists) {
-      return false;
-    } else {
-      return true;
-    }
+    final res = await _client.from('matches').select('game_code').eq('game_code', gameCode).maybeSingle();
+    return res == null;
   }
 
   //TOGGLE GAME TYPE
@@ -119,19 +107,36 @@ class LobbyController {
     return tmpList;
   }
 
-  //TOGGLE GAME TYPE IN FIRESTORE
+  //TOGGLE GAME TYPE IN SUPABASE
   Future<void> toggleGameTypeFstore({required String? gameCode, required int gameType}) async {
     if (gameCode == null) return;
 
-    await FirebaseFirestore.instance.collection('matches').doc(gameCode).update({'game_type': gameType});
+    await _client.from('matches').update({'game_type': gameType}).eq('game_code', gameCode);
     return;
   }
 
-  StreamSubscription? listenToChanges(GameModel? gameModel, void Function(DocumentSnapshot<Map<String, dynamic>>)? onData) {
-    if (gameModel?.code != null) {
-      return FirebaseFirestore.instance.collection('matches').doc(gameModel?.code).snapshots().listen(onData);
-    }
-    return null;
+  RealtimeChannel? listenToChanges(GameModel? gameModel, void Function(Map<String, dynamic>? data, {required bool deleted})? onData) {
+    final code = gameModel?.code;
+    if (code == null || onData == null) return null;
+
+    return _client.channel('match:$code').onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'matches',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'game_code',
+        value: code,
+      ),
+      callback: (payload) {
+        if (payload.eventType == PostgresChangeEvent.delete) {
+          onData(null, deleted: true);
+          return;
+        }
+        final record = payload.newRecord;
+        onData(Map<String, dynamic>.from(record), deleted: false);
+      },
+    ).subscribe();
   }
 
   //*******************HOST********************
@@ -143,22 +148,23 @@ class LobbyController {
     final userId = FirebaseAuth.instance.currentUser?.uid;
 
     if (userId != null) {
-      await matchesCollection.doc(gameCode).set({
-        'players': FieldValue.arrayUnion([PlayerMatchModel(player: userCollection.doc(userId)).toMap()])
-      }, SetOptions(merge: true));
-    }
-
-    GameModel gameModel = GameModel.fromMap((await matchesCollection.doc(gameCode).get()).data() ?? {});
-    List<PlayerMatchModel> players = [];
-
-    for (final e in gameModel.players) {
-      if (e.loadedPlayer == null) {
-        final data = (await e.player?.get())?.data();
-        players.addAll([e.copyWith(loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data))]);
+      final existing = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+      if (existing != null) {
+        final gameModel = GameModel.fromMap(Map<String, dynamic>.from(existing));
+        final alreadyJoined = gameModel.players.any((p) => p.playerId == userId);
+        if (!alreadyJoined) {
+          final players = [
+            ...gameModel.players.map((e) => e.toMap()),
+            PlayerMatchModel(playerId: userId).toMap(),
+          ];
+          await _client.from('matches').update({'players': players}).eq('game_code', gameCode);
+        }
       }
     }
 
-    return gameModel.copyWith(players: players);
+    final data = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(data ?? {}));
+    return gameModel.copyWith(players: await _loadPlayers(gameModel.players));
   }
 
   //LEAVE GAME
@@ -168,17 +174,13 @@ class LobbyController {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     playerModelList.removeWhere(
       (element) {
-        return element.player?.id == userId;
+        return element.playerId == userId;
       },
     );
     if (userId != null) {
-      await matchesCollection.doc(gameCode).set({
-        'players': playerModelList.map(
-          (e) {
-            return e.toMap();
-          },
-        ).toList()
-      }, SetOptions(merge: true));
+      await _client.from('matches').update({
+        'players': playerModelList.map((e) => e.toMap()).toList(),
+      }).eq('game_code', gameCode);
     }
   }
 
@@ -190,20 +192,16 @@ class LobbyController {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     playerModelList = playerModelList.map(
       (e) {
-        if (e.player?.id == userId) {
+        if (e.playerId == userId) {
           e = e.copyWith(isReady: !(e.isReady ?? true));
         }
         return e;
       },
     ).toList();
     if (userId != null) {
-      await matchesCollection.doc(gameCode).update({
-        'players': playerModelList.map(
-          (e) {
-            return e.toMap();
-          },
-        ).toList()
-      });
+      await _client.from('matches').update({
+        'players': playerModelList.map((e) => e.toMap()).toList(),
+      }).eq('game_code', gameCode);
     }
   }
 
@@ -211,10 +209,30 @@ class LobbyController {
     if (playerModelList == null) return false;
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    return playerModelList.firstWhere((element) => element.player?.id == userId, orElse: () {
-          return const PlayerMatchModel(player: null, isReady: false);
-        }).isReady ??
+    return playerModelList
+            .firstWhere(
+              (element) => element.playerId == userId,
+              orElse: () => const PlayerMatchModel(playerId: null, isReady: false),
+            )
+            .isReady ??
         false;
+  }
+
+  Future<List<PlayerMatchModel>> _loadPlayers(List<PlayerMatchModel> players) async {
+    final List<PlayerMatchModel> loaded = [];
+    for (final e in players) {
+      if (e.loadedPlayer != null || e.playerId == null) {
+        loaded.add(e);
+        continue;
+      }
+      final data = await _client.from('users').select().eq('id', e.playerId!).maybeSingle();
+      loaded.add(
+        e.copyWith(
+          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(data)),
+        ),
+      );
+    }
+    return loaded;
   }
 
   //*******************CLIENT********************
