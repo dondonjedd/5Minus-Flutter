@@ -38,10 +38,12 @@ class GameModel {
     this.winner,
   });
 
+  /// Timestamps are always normalised to UTC so that values read back from
+  /// Postgres (`timestamptz`) compare equal to the ones written locally.
   static DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
+    if (value is DateTime) return value.toUtc();
+    if (value is String) return DateTime.tryParse(value)?.toUtc();
     return null;
   }
 
@@ -82,8 +84,8 @@ class GameModel {
         'discard_deck': discardDeck?.toMapList(),
         'turn': turn,
         'drawn_card': drawnCard?.toMap(),
-        'turn_start_time': turnStartTime?.toIso8601String(),
-        'power_start_time': powerStartTime?.toIso8601String(),
+        'turn_start_time': turnStartTime?.toUtc().toIso8601String(),
+        'power_start_time': powerStartTime?.toUtc().toIso8601String(),
         'is_challenge_complete': isChallengeComplete,
         'winner': winner?.toMap(),
       };

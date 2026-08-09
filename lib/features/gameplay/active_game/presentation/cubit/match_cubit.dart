@@ -41,7 +41,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
     if (isHost(hostId: gameModel.hostId)) {
       updateDetails['turn_start_time'] =
-          DateTime.now().add(Duration(milliseconds: ConfigurationData.turnDuration)).toIso8601String();
+          DateTime.now().toUtc().add(Duration(milliseconds: ConfigurationData.turnDuration)).toIso8601String();
     }
 
     await _client.from('matches').update(updateDetails).eq('game_code', gameModel.code);
@@ -75,10 +75,11 @@ class MatchCubit extends Cubit<GameModel?> {
   startNextTurn() async {
     if (state?.code == null) return;
     int newTurn = state?.turn == 1 ? 0 : 1;
-    DateTime? newTime = state?.turnStartTime?.add(Duration(milliseconds: ConfigurationData.turnDuration));
+    DateTime newTime =
+        (state?.turnStartTime ?? DateTime.now().toUtc()).add(Duration(milliseconds: ConfigurationData.turnDuration));
     await _client.from('matches').update({
       'turn': newTurn,
-      'turn_start_time': (newTime ?? DateTime.now()).toIso8601String(),
+      'turn_start_time': newTime.toUtc().toIso8601String(),
     }).eq('game_code', state!.code);
 
     emit(state?.copyWith(turn: newTurn, turnStartTime: newTime));
