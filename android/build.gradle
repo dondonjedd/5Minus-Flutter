@@ -16,6 +16,27 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+// Some plugins (e.g. flutter_facebook_auth) declare no JVM target, so AGP defaults
+// their Java compilation to 1.8 while Kotlin defaults to the JDK in use. Pin both.
+// Must be registered before evaluationDependsOn below, which eagerly evaluates :app.
+subprojects {
+    afterEvaluate { proj ->
+        if (proj.hasProperty("android")) {
+            proj.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_11
+                    targetCompatibility JavaVersion.VERSION_11
+                }
+            }
+            if (proj.plugins.hasPlugin("kotlin-android")) {
+                proj.android.kotlinOptions {
+                    jvmTarget = JavaVersion.VERSION_11.toString()
+                }
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
