@@ -112,8 +112,8 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       if (power == CardPower.look) return HandInteractionMode.queenLook;
       if (power == CardPower.swap) return HandInteractionMode.jackPick;
     }
+    // Single-tap = replace when a drawn card is pending. Eliminate is double-tap only.
     if (cubit.canDiscardOrReplace()) return HandInteractionMode.replace;
-    if (cubit.canEliminate()) return HandInteractionMode.eliminate;
     return HandInteractionMode.none;
   }
 
@@ -142,14 +142,15 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       setState(() => _statusMessage = null);
       return;
     }
-    if (mode == HandInteractionMode.eliminate) {
-      final err = await cubit.eliminateCard(handIndex);
-      setState(() => _statusMessage = err);
-      return;
-    }
     if (mode == HandInteractionMode.jackPick) {
       _toggleJackPick(userIndex!, handIndex, cubit);
     }
+  }
+
+  Future<void> _onOwnCardDoubleTap(MatchCubit cubit, int handIndex) async {
+    if (!cubit.canEliminate()) return;
+    final err = await cubit.eliminateCard(handIndex);
+    setState(() => _statusMessage = err);
   }
 
   Future<void> _onOpponentCardTap(MatchCubit cubit, int handIndex) async {
@@ -274,8 +275,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       isOpponent: true,
                                       mode: mode,
                                       revealedIndexes: {
-                                        if (_queenRevealPlayer == oppIndex && _queenRevealIndex != null)
-                                          _queenRevealIndex!,
+                                        if (_queenRevealPlayer == oppIndex && _queenRevealIndex != null) _queenRevealIndex!,
                                       },
                                       jackSelected: _jackPicks,
                                       onCardTap: (i) => _onOpponentCardTap(matchCubit, i),
@@ -309,10 +309,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 // Face-up only for the active player; opponent sees the back.
-                                                if (matchCubit.isMyTurn())
-                                                  FrontCard(cardModel: state!.drawnCard!)
-                                                else
-                                                  const BackCard(),
+                                                if (matchCubit.isMyTurn()) FrontCard(cardModel: state!.drawnCard!) else const BackCard(),
                                                 if (matchCubit.canDiscardOrReplace())
                                                   TextButton(
                                                     onPressed: () => matchCubit.discardDrawnCard(),
@@ -338,11 +335,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     mode: mode,
                                     revealedIndexes: {
                                       ..._peekedIndexes,
-                                      if (_queenRevealPlayer == userIndex && _queenRevealIndex != null)
-                                        _queenRevealIndex!,
+                                      if (_queenRevealPlayer == userIndex && _queenRevealIndex != null) _queenRevealIndex!,
                                     },
                                     jackSelected: _jackPicks,
                                     onCardTap: (i) => _onOwnCardTap(matchCubit, i),
+                                    onCardDoubleTap: matchCubit.canEliminate()
+                                        ? (i) => _onOwnCardDoubleTap(matchCubit, i)
+                                        : null,
                                     onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
                                     onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
                                   ),
@@ -369,6 +368,7 @@ class PlayerView extends StatelessWidget {
     required this.revealedIndexes,
     this.jackSelected,
     this.onCardTap,
+    this.onCardDoubleTap,
     this.onChallenge,
     this.onEndTurn,
   });
@@ -380,6 +380,7 @@ class PlayerView extends StatelessWidget {
   final Set<int> revealedIndexes;
   final Set<String>? jackSelected;
   final void Function(int handIndex)? onCardTap;
+  final void Function(int handIndex)? onCardDoubleTap;
   final VoidCallback? onChallenge;
   final VoidCallback? onEndTurn;
 
@@ -427,6 +428,7 @@ class PlayerView extends StatelessWidget {
               revealedIndexes: revealedIndexes,
               jackSelected: jackSelected,
               onCardTap: onCardTap,
+              onCardDoubleTap: onCardDoubleTap,
             ),
           ),
         ),

@@ -87,8 +87,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       if (matchingElement != null) {
         tmpList.add(matchingElement);
       } else if (element.playerId != null) {
-        final userData =
-            await SupabaseService.client.from('users').select().eq('id', element.playerId!).maybeSingle();
+        final userData = await SupabaseService.client.from('users').select().eq('id', element.playerId!).maybeSingle();
         tmpList.add(
           element.copyWith(
             loadedPlayer: userData == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(userData)),

@@ -23,6 +23,7 @@ class PlayerHands extends StatelessWidget {
     this.mode = HandInteractionMode.none,
     this.revealedIndexes = const {},
     this.onCardTap,
+    this.onCardDoubleTap,
     this.jackSelected,
   });
 
@@ -31,6 +32,7 @@ class PlayerHands extends StatelessWidget {
   final HandInteractionMode mode;
   final Set<int> revealedIndexes;
   final void Function(int handIndex)? onCardTap;
+  final void Function(int handIndex)? onCardDoubleTap;
   final Set<String>? jackSelected; // "playerIndex:handIndex"
 
   @override
@@ -46,12 +48,14 @@ class PlayerHands extends StatelessWidget {
           itemBuilder: (context, index) {
             final showFront = revealedIndexes.contains(index);
             final selected = jackSelected?.contains('$playerIndex:$index') ?? false;
-            final tappable = onCardTap != null && _isInteractive(mode, isOpponent);
+            final singleTappable = onCardTap != null && _isInteractive(mode, isOpponent);
+            final doubleTappable = onCardDoubleTap != null && !isOpponent;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: GestureDetector(
-                onTap: tappable ? () => onCardTap!(index) : null,
+                onTap: singleTappable ? () => onCardTap!(index) : null,
+                onDoubleTap: doubleTappable ? () => onCardDoubleTap!(index) : null,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [

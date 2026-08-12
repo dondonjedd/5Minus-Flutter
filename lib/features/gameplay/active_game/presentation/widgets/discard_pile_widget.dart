@@ -28,7 +28,7 @@ class DiscardPile extends StatelessWidget {
                     ? Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: candidateData.isNotEmpty ? Colors.black.withOpacity(0.15) : null,
+                          color: candidateData.isNotEmpty ? Colors.black.withValues(alpha: 0.15) : null,
                         ),
                         height: double.infinity,
                         width: double.infinity,
@@ -55,7 +55,7 @@ class DiscardPile extends StatelessWidget {
                       )
                     : Container(
                         decoration: BoxDecoration(
-                          color: candidateData.isNotEmpty ? Colors.black.withOpacity(0.15) : null,
+                          color: candidateData.isNotEmpty ? Colors.black.withValues(alpha: 0.15) : null,
                           shape: BoxShape.circle,
                         ),
                       ),

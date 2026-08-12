@@ -177,8 +177,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
       final parsed = GameModel.fromMap(Map<String, dynamic>.from(rows.first));
       final players = parsed.players.asMap().entries.map((e) {
-        final loaded =
-            (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
+        final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
         final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
         return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
       }).toList();
@@ -200,9 +199,8 @@ class MatchCubit extends Cubit<GameModel?> {
     final me = _me();
     if (me == null) return false;
     if (me.eliminationLocked) return false;
-    if (topDiscard == null) return false;
-    // Eliminations only after draw+discard (step 3 in turn pipeline).
-    return me.actionsComplete;
+    // Allowed before discard/replace so the current top discard can still be matched.
+    return topDiscard != null;
   }
 
   bool canChallenge() {
@@ -530,7 +528,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> _endAsDraw() async {
     if (state == null) return;
-    final draw = const PlayerMatchModel(playerId: GameConstants.drawWinnerId);
+    const draw = PlayerMatchModel(playerId: GameConstants.drawWinnerId);
     final game = state!.copyWith(winner: draw, isActive: false, isChallengeComplete: true);
     await _client.from('matches').update({
       'winner': draw.toMap(),
@@ -557,14 +555,11 @@ class MatchCubit extends Cubit<GameModel?> {
     final row = await _client.from('matches').select('players').eq('game_code', code).maybeSingle();
     if (row == null || state?.code != code) return;
 
-    final remote = (row['players'] as List<dynamic>? ?? [])
-        .map((e) => PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final remote = (row['players'] as List<dynamic>? ?? []).map((e) => PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map))).toList();
     if (idx >= remote.length) return;
 
     final merged = remote.asMap().entries.map((e) {
-      final loaded =
-          (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
+      final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
       final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
       return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
     }).toList();
@@ -605,9 +600,7 @@ class MatchCubit extends Cubit<GameModel?> {
   GameModel _cloneState() {
     final s = state!;
     return GameModel.fromMap(s.toMap()).copyWith(
-      players: s.players
-          .map((p) => PlayerMatchModel.fromMap(p.toMap()).copyWith(loadedPlayer: p.loadedPlayer))
-          .toList(),
+      players: s.players.map((p) => PlayerMatchModel.fromMap(p.toMap()).copyWith(loadedPlayer: p.loadedPlayer)).toList(),
       drawDeck: s.drawDeck == null ? null : Deck(list: List<CardModel>.from(s.drawDeck!.cardDeck ?? [])),
       discardDeck: s.discardDeck == null ? null : Deck(list: List<CardModel>.from(s.discardDeck!.cardDeck ?? [])),
     );
@@ -675,10 +668,8 @@ class MatchCubit extends Cubit<GameModel?> {
     if (deleted || data == null) return false;
     final parsed = GameModel.fromMap(data);
     final players = parsed.players.asMap().entries.map((e) {
-      final loaded =
-          (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
-      final sameId = loaded != null &&
-          state!.players[e.key].playerId == e.value.playerId;
+      final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
+      final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
       return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
     }).toList();
     emit(parsed.copyWith(players: players));

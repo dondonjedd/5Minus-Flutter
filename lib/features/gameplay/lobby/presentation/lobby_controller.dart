@@ -129,24 +129,27 @@ class LobbyController {
     final code = gameModel?.code;
     if (code == null || onData == null) return null;
 
-    return _client.channel('match:$code').onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'matches',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'game_code',
-        value: code,
-      ),
-      callback: (payload) {
-        if (payload.eventType == PostgresChangeEvent.delete) {
-          onData(null, deleted: true);
-          return;
-        }
-        final record = payload.newRecord;
-        onData(Map<String, dynamic>.from(record), deleted: false);
-      },
-    ).subscribe();
+    return _client
+        .channel('match:$code')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'matches',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'game_code',
+            value: code,
+          ),
+          callback: (payload) {
+            if (payload.eventType == PostgresChangeEvent.delete) {
+              onData(null, deleted: true);
+              return;
+            }
+            final record = payload.newRecord;
+            onData(Map<String, dynamic>.from(record), deleted: false);
+          },
+        )
+        .subscribe();
   }
 
   //*******************HOST********************
