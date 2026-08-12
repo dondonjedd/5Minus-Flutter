@@ -19,11 +19,11 @@ class JoinGameScreen extends StatelessWidget {
             SizedBox(
               height: MediaQuery.sizeOf(context).height * 0.25,
             ),
-            //PUBLIC GAME
-            ElevatedButton(
-              onPressed: () {},
-              style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
-              child: const Text('Join Public Game'),
+            //PUBLIC GAME (out of scope — stub disabled)
+            const ElevatedButton(
+              onPressed: null,
+              style: ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(300, 45))),
+              child: Text('Join Public Game'),
             ),
             const Padding(padding: EdgeInsets.only(bottom: 60)),
 

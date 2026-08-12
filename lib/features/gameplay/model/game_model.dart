@@ -5,6 +5,8 @@ import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
 import 'card_model.dart';
 
+const Object _unset = Object();
+
 class GameModel {
   final String hostId;
   final String code;
@@ -56,12 +58,12 @@ class GameModel {
               },
             ).toList() ??
             [],
-        gameType: data['game_type'] as int?,
+        gameType: (data['game_type'] as num?)?.toInt(),
         isActive: (data['is_active'] as bool?) ?? false,
         hasStarted: (data['has_started'] as bool?) ?? false,
         drawDeck: data['draw_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['draw_deck']),
         discardDeck: data['discard_deck'] is! List<dynamic> ? null : Deck.fromMapList(data['discard_deck']),
-        turn: data['turn'] as int?,
+        turn: (data['turn'] as num?)?.toInt(),
         drawnCard: data['drawn_card'] == null
             ? null
             : CardModel.fromMap(Map<String, dynamic>.from(data['drawn_card'] as Map)),
@@ -101,29 +103,30 @@ class GameModel {
     int? gameType,
     bool? isActive,
     bool? hasStarted,
-    Deck? drawDeck,
-    Deck? discardDeck,
+    Object? drawDeck = _unset,
+    Object? discardDeck = _unset,
     int? turn,
-    CardModel? drawnCard,
-    DateTime? turnStartTime,
-    DateTime? powerStartTime,
+    Object? drawnCard = _unset,
+    Object? turnStartTime = _unset,
+    Object? powerStartTime = _unset,
     bool? isChallengeComplete,
-    PlayerMatchModel? winner,
+    Object? winner = _unset,
   }) {
     return GameModel(
-        hostId: hostId,
-        code: code,
-        players: players ?? this.players,
-        gameType: gameType ?? this.gameType,
-        isActive: isActive ?? this.isActive,
-        hasStarted: hasStarted ?? this.hasStarted,
-        drawDeck: drawDeck ?? this.drawDeck,
-        discardDeck: discardDeck ?? this.discardDeck,
-        turn: turn ?? this.turn,
-        drawnCard: drawnCard ?? this.drawnCard,
-        turnStartTime: turnStartTime ?? this.turnStartTime,
-        powerStartTime: powerStartTime ?? this.powerStartTime,
-        isChallengeComplete: isChallengeComplete ?? this.isChallengeComplete,
-        winner: winner ?? this.winner);
+      hostId: hostId,
+      code: code,
+      players: players ?? this.players,
+      gameType: gameType ?? this.gameType,
+      isActive: isActive ?? this.isActive,
+      hasStarted: hasStarted ?? this.hasStarted,
+      drawDeck: identical(drawDeck, _unset) ? this.drawDeck : drawDeck as Deck?,
+      discardDeck: identical(discardDeck, _unset) ? this.discardDeck : discardDeck as Deck?,
+      turn: turn ?? this.turn,
+      drawnCard: identical(drawnCard, _unset) ? this.drawnCard : drawnCard as CardModel?,
+      turnStartTime: identical(turnStartTime, _unset) ? this.turnStartTime : turnStartTime as DateTime?,
+      powerStartTime: identical(powerStartTime, _unset) ? this.powerStartTime : powerStartTime as DateTime?,
+      isChallengeComplete: isChallengeComplete ?? this.isChallengeComplete,
+      winner: identical(winner, _unset) ? this.winner : winner as PlayerMatchModel?,
+    );
   }
 }

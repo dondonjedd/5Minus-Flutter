@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer';
 
 import 'package:five_minus/core/data/configuration_data.dart';
 import 'package:flutter/material.dart';
@@ -29,52 +28,63 @@ class _PlayerTimerState extends State<PlayerTimer> with SingleTickerProviderStat
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (timeStamp) {
-        // Set up the AnimationController
-        _controller = AnimationController(
-          duration: Duration(milliseconds: ConfigurationData.turnDuration), // Animation duration of 5 seconds
-          vsync: this,
-        );
-
-        // Set up the Tween animation
-        _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
-        final matchCubit = context.read<MatchCubit>();
-
-        if (matchCubit.state?.turn == widget.userIndex) _scheduleAnimation(context);
-      },
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller = AnimationController(
+        duration: Duration(milliseconds: ConfigurationData.turnDuration),
+        vsync: this,
+      );
+      _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller!);
+      setState(() {});
+      _syncToState(context.read<MatchCubit>().state);
+    });
   }
 
-  void _scheduleAnimation(BuildContext context) {
-    if (_timer?.isActive ?? false) return;
-    final matchCubit = context.read<MatchCubit>();
+  /// Drive the ring from the shared `turnStartTime` so every client shows the
+  /// same progress for the active turn (wall-clock based, not local animation age).
+  void _syncToState(GameModel? state) {
+    _timer?.cancel();
+    _timer = null;
 
-    final now = DateTime.now();
-    // Set the target DateTime to start the animation
-    DateTime targetTime = matchCubit.state?.turnStartTime ?? now; // 10 seconds from now
+    final controller = _controller;
+    if (controller == null) return;
 
-    // Calculate the delay until the target DateTime
-    Duration delay = targetTime.difference(now);
-    log(targetTime.toString());
-
-    // Set a timer to start the animation at the specified DateTime
-    if (delay > Duration.zero) {
-      _timer = Timer(delay.abs(), () {
-        _controller?.forward(); // Start the animation
-      });
-    } else {
-      // If the target time has already passed, start the animation immediately
-      _controller?.forward(from: delay.inMilliseconds.abs() / ConfigurationData.turnDuration);
+    final isActiveTurn = (state?.isActive ?? false) && state?.turn == widget.userIndex;
+    if (!isActiveTurn || state?.turnStartTime == null) {
+      controller.stop();
+      controller.value = 0;
+      return;
     }
+
+    final start = state!.turnStartTime!.toUtc();
+    final now = DateTime.now().toUtc();
+    final durationMs = ConfigurationData.turnDuration;
+    final elapsedMs = now.difference(start).inMilliseconds;
+
+    if (elapsedMs < 0) {
+      // Turn start is still in the future (countdown / clock skew) — wait, then run.
+      controller.value = 0;
+      _timer = Timer(start.difference(now), () {
+        if (!mounted) return;
+        _syncToState(context.read<MatchCubit>().state);
+      });
+      return;
+    }
+
+    final from = (elapsedMs / durationMs).clamp(0.0, 1.0);
+    controller.duration = Duration(milliseconds: durationMs);
+    if (from >= 1.0) {
+      controller.value = 1.0;
+      return;
+    }
+
+    controller.forward(from: from);
   }
 
   @override
   void dispose() {
-    // Dispose of the controller and timer when the widget is removed
-    _controller?.dispose();
     _timer?.cancel();
-
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -82,40 +92,30 @@ class _PlayerTimerState extends State<PlayerTimer> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     return BlocConsumer<MatchCubit, GameModel?>(
       listenWhen: (previous, current) {
-        if (previous?.turn != current?.turn || previous?.turnStartTime != current?.turnStartTime) {
-          return true;
-        }
-        return false;
+        return previous?.turn != current?.turn ||
+            previous?.turnStartTime != current?.turnStartTime ||
+            previous?.isActive != current?.isActive;
       },
-      listener: (context, state) {
-        if (state?.turn == widget.userIndex) {
-          _controller?.reset();
-          _scheduleAnimation(context);
-        }
-      },
+      listener: (context, state) => _syncToState(state),
       builder: (context, state) {
         if (!(state?.isActive ?? false)) return const SizedBox.shrink();
-
         if (widget.userIndex != state?.turn) return const SizedBox.shrink();
+
+        final animation = _animation;
+        if (animation == null) return const SizedBox.shrink();
 
         return SizedBox(
           height: 60,
           width: 60,
-          child: _animation == null
-              ? const SizedBox.shrink()
-              : ValueListenableBuilder(
-                  valueListenable: _animation!,
-                  builder: (_, val, __) {
-                    if (val == 1 && state?.turn == widget.userIndex) {
-                      _controller?.reset();
-                      _timer?.cancel();
-                      context.read<MatchCubit>().startNextTurn();
-                    }
-                    return CircularProgressIndicator(
-                      color: Colors.lightGreen,
-                      value: val,
-                    );
-                  }),
+          child: ValueListenableBuilder<double>(
+            valueListenable: animation,
+            builder: (_, val, __) {
+              return CircularProgressIndicator(
+                color: Colors.lightGreen,
+                value: val,
+              );
+            },
+          ),
         );
       },
     );

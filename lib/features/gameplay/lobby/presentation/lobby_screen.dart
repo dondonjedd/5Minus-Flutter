@@ -46,7 +46,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
         }
         //INITIALIZE CLIENT
         else {
-          gameModel = await widget.controller.joinGame(widget.lobbyParams.gameCode ?? '');
+          try {
+            gameModel = await widget.controller.joinGame(widget.lobbyParams.gameCode ?? '');
+          } catch (e) {
+            if (!mounted) return;
+            widget.controller.navigateDashboard(context);
+            return;
+          }
         }
 
         //INITIALIZE ISHOST
@@ -94,11 +100,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
 
     gameModel = tempGameModel.copyWith(gameType: tempGameModel.gameType, players: tmpList);
-    if (gameModel?.gameType != null) {
-      for (int i = 0; i < selectedGameType.length; i++) {
-        selectedGameType[i] = i == gameModel!.gameType;
-      }
-    }
 
     if (gameModel?.hasStarted ?? false) {
       if (!context.mounted) return;
@@ -109,23 +110,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   bool canStart() {
-    // if ((gameModel?.players.length ?? 0) < 2) return false;
     if (!isHost) return false;
-    if (gameModel?.players.any(
-          (element) {
-            return !(element.isReady ?? false);
-          },
-        ) ??
-        true) return false;
-
+    if ((gameModel?.players.length ?? 0) != LobbyController.maxPlayers) return false;
+    if (gameModel?.players.any((element) => !(element.isReady ?? false)) ?? true) return false;
     return true;
   }
-
-  List<bool> selectedGameType = <bool>[
-    true,
-    false,
-  ];
-  bool isToggleButtonLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +242,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ).toList() ??
                             [],
                         ...List.generate(
-                          4 - (gameModel?.players.length ?? 0),
+                          LobbyController.maxPlayers - (gameModel?.players.length ?? 0),
                           (index) {
                             return Expanded(
                               child: Column(
@@ -284,81 +273,49 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   const Padding(padding: EdgeInsets.only(bottom: 24)),
 
-                  //GAME TYPE
-                  StatefulBuilder(builder: (context, setStateFn) {
-                    return ToggleButtons(
-                      direction: Axis.horizontal,
-                      onPressed: !isHost
-                          ? null
-                          : (int index) async {
-                              selectedGameType = widget.controller.toggleGameTypeLocal(index: index, selectedGameType: selectedGameType);
-
-                              setStateFn(() {
-                                isToggleButtonLoading = true;
-                              });
-
-                              await widget.controller.toggleGameTypeFstore(gameCode: gameModel?.code, gameType: index);
-
-                              setStateFn(() {
-                                isToggleButtonLoading = false;
-                              });
-                            },
-                      constraints: const BoxConstraints(minHeight: 40),
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      isSelected: selectedGameType,
-                      children: [
-                        SizedBox(
-                          width: 120,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (selectedGameType[0])
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: isToggleButtonLoading
-                                      ? const SizedBox(
-                                          height: 15,
-                                          width: 15,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ))
-                                      : const Icon(Icons.check),
-                                ),
-                              const Text('Private'),
-                            ],
-                          ),
+                  //GAME TYPE (public matchmaking out of scope — private only)
+                  ToggleButtons(
+                    direction: Axis.horizontal,
+                    onPressed: null,
+                    constraints: const BoxConstraints(minHeight: 40),
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                    isSelected: const [true, false],
+                    children: const [
+                      SizedBox(
+                        width: 120,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(right: 8),
+                              child: Icon(Icons.check),
+                            ),
+                            Text('Private'),
+                          ],
                         ),
-                        SizedBox(
-                          width: 120,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (selectedGameType[1])
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: isToggleButtonLoading
-                                      ? const SizedBox(
-                                          height: 15,
-                                          width: 15,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ))
-                                      : const Icon(Icons.check),
-                                ),
-                              const Text('Public'),
-                            ],
-                          ),
+                      ),
+                      SizedBox(
+                        width: 120,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Public'),
+                          ],
                         ),
-                      ],
-                    );
-                  }),
+                      ),
+                    ],
+                  ),
                   const Padding(padding: EdgeInsets.only(bottom: 24)),
                   //START OR READY BUTTON
                   ElevatedButton(
                     onPressed: isHost
                         ? canStart()
                             ? () {
-                                widget.controller.startGame(context, gameCode: gameModel?.code);
+                                widget.controller.startGame(
+                                  context,
+                                  gameCode: gameModel?.code,
+                                  players: gameModel?.players,
+                                );
                               }
                             : null
                         : () {

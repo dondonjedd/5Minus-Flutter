@@ -17,6 +17,10 @@ import 'lobby_screen.dart';
 
 class LobbyController {
   static const String routeName = '/LobbyController';
+
+  /// Product cap for this milestone; schema still allows more players later.
+  static const int maxPlayers = 2;
+
   static Widget screen({required LobbyParams params}) {
     return LobbyScreen(
       controller: LobbyController._(),
@@ -25,6 +29,9 @@ class LobbyController {
   }
 
   LobbyController._();
+
+  /// Pre-lobby join validation (full / started / missing).
+  static Future<String?> joinGate(String gameCode) => LobbyController._().joinGameOrError(gameCode);
 
   SupabaseClient get _client => SupabaseService.client;
 
@@ -38,8 +45,11 @@ class LobbyController {
   String characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
   //START GAME
-  startGame(BuildContext context, {required String? gameCode}) async {
+  startGame(BuildContext context, {required String? gameCode, required List<PlayerMatchModel>? players}) async {
     if (gameCode == null) return;
+    if ((players?.length ?? 0) != maxPlayers) return;
+    if (players!.any((p) => !(p.isReady ?? false))) return;
+
     await _client.from('matches').update({'has_started': true}).eq('game_code', gameCode);
 
     if (!context.mounted) return;
@@ -143,23 +153,37 @@ class LobbyController {
 
   //*******************CLIENT********************
 
+  /// Returns a join error message, or null on success.
+  Future<String?> joinGameOrError(String gameCode) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return 'Not signed in';
+
+    final existing = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    if (existing == null) return 'Game does not exist';
+
+    final gameModel = GameModel.fromMap(Map<String, dynamic>.from(existing));
+    if (gameModel.hasStarted) return 'Game already started';
+
+    final alreadyJoined = gameModel.players.any((p) => p.playerId == userId);
+    if (!alreadyJoined) {
+      if (gameModel.players.length >= maxPlayers) {
+        return 'Game is full (max $maxPlayers players)';
+      }
+      final players = [
+        ...gameModel.players.map((e) => e.toMap()),
+        PlayerMatchModel(playerId: userId).toMap(),
+      ];
+      await _client.from('matches').update({'players': players}).eq('game_code', gameCode);
+    }
+
+    return null;
+  }
+
   //JOIN GAME
   Future<GameModel> joinGame(String gameCode) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-
-    if (userId != null) {
-      final existing = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
-      if (existing != null) {
-        final gameModel = GameModel.fromMap(Map<String, dynamic>.from(existing));
-        final alreadyJoined = gameModel.players.any((p) => p.playerId == userId);
-        if (!alreadyJoined) {
-          final players = [
-            ...gameModel.players.map((e) => e.toMap()),
-            PlayerMatchModel(playerId: userId).toMap(),
-          ];
-          await _client.from('matches').update({'players': players}).eq('game_code', gameCode);
-        }
-      }
+    final error = await joinGameOrError(gameCode);
+    if (error != null) {
+      throw StateError(error);
     }
 
     final data = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();

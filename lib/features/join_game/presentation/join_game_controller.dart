@@ -16,14 +16,13 @@ class JoinGameController {
 
   joinGame(BuildContext context, String gameCode) async {
     LoadingOverlay().show(context);
-    if (!(await isGameExist(gameCode))) {
-      LoadingOverlay().hide();
-      if (!context.mounted) return;
-      DialogUtility().showError(context, title: 'Game does not exist', message: 'Please try another code');
-      return;
-    }
+    final error = await LobbyController.joinGate(gameCode);
     LoadingOverlay().hide();
     if (!context.mounted) return;
+    if (error != null) {
+      DialogUtility().showError(context, title: 'Cannot join', message: error);
+      return;
+    }
     context.goNamed(LobbyController.routeName, extra: LobbyParams(isCreateGame: false, gameCode: gameCode));
   }
 

@@ -53,23 +53,19 @@ class DashboardScreen extends StatelessWidget {
               MenuButton(
                 title: 'Leaderboard',
                 assetPath: AssetPath.leaderboard,
-                onTap: () async {
-                  controller.navigateLeaderboard(context);
-                },
+                onTap: null,
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
               MenuButton(
                 title: 'Tutorial',
                 assetPath: AssetPath.tutorial,
-                onTap: () {},
+                onTap: null,
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
               MenuButton(
                 title: 'Settings',
                 assetPath: AssetPath.settings,
-                onTap: () {
-                  controller.navigateSettings(context);
-                },
+                onTap: null,
               ),
               SizedBox(
                 height: MediaQuery.sizeOf(context).height * 0.15,

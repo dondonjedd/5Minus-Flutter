@@ -63,7 +63,8 @@ class CardModel extends Equatable {
     int res = 0;
 
     switch (rank) {
-      case CardRank.jack || CardRank.queen:
+      case CardRank.jack:
+      case CardRank.queen:
         res = 10;
         break;
 
