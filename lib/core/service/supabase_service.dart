@@ -70,20 +70,6 @@ class SupabaseService {
     }
   }
 
-  static Future<void> insertMatch(Map<String, dynamic> row) async {
-    try {
-      await _client.from('matches').insert(row);
-    } on ServerException {
-      rethrow;
-    } catch (e) {
-      throw ServerException(
-        title: 'Match insert error',
-        message: e.toString(),
-        statusCode: '999',
-      );
-    }
-  }
-
   static Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) async {
     try {
       await _client.from('matches').update(patch).eq('game_code', gameCode);
@@ -103,7 +89,10 @@ class SupabaseService {
     Map<String, dynamic> params,
   ) async {
     try {
-      final data = await _client.rpc(functionName, params: params);
+      final data = params.isEmpty
+          ? await _client.rpc(functionName)
+          : await _client.rpc(functionName, params: params);
+      if (data == null) return <String, dynamic>{};
       if (data is Map<String, dynamic>) return data;
       if (data is Map) return Map<String, dynamic>.from(data);
       if (data is String) {
@@ -126,20 +115,6 @@ class SupabaseService {
     } catch (e) {
       throw ServerException(
         title: 'Match play error',
-        message: e.toString(),
-        statusCode: '999',
-      );
-    }
-  }
-
-  static Future<void> deleteMatch(String gameCode) async {
-    try {
-      await _client.from('matches').delete().eq('game_code', gameCode);
-    } on ServerException {
-      rethrow;
-    } catch (e) {
-      throw ServerException(
-        title: 'Match delete error',
         message: e.toString(),
         statusCode: '999',
       );
@@ -217,26 +192,6 @@ class SupabaseService {
     }
   }
 
-  static Future<void> insertSeat(Map<String, dynamic> row) async {
-    try {
-      await _client.from('match_players').insert(row);
-    } on PostgrestException catch (e) {
-      throw ServerException(
-        title: 'Seat insert error',
-        message: e.message,
-        statusCode: e.code ?? '999',
-      );
-    } on ServerException {
-      rethrow;
-    } catch (e) {
-      throw ServerException(
-        title: 'Seat insert error',
-        message: e.toString(),
-        statusCode: '999',
-      );
-    }
-  }
-
   static Future<void> updateSeat(String gameCode, String userId, Map<String, dynamic> patch) async {
     try {
       await _client.from('match_players').update(patch).eq('game_code', gameCode).eq('user_id', userId);
@@ -245,20 +200,6 @@ class SupabaseService {
     } catch (e) {
       throw ServerException(
         title: 'Seat update error',
-        message: e.toString(),
-        statusCode: '999',
-      );
-    }
-  }
-
-  static Future<void> deleteSeat(String gameCode, String userId) async {
-    try {
-      await _client.from('match_players').delete().eq('game_code', gameCode).eq('user_id', userId);
-    } on ServerException {
-      rethrow;
-    } catch (e) {
-      throw ServerException(
-        title: 'Seat delete error',
         message: e.toString(),
         statusCode: '999',
       );

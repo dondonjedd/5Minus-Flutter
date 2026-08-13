@@ -68,7 +68,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> deleteGame() async {
     if (state?.code.isEmpty ?? true) return;
-    await _matchRepository.deleteMatch(state!.code);
+    await _matchRepository.cancelLobby(state!.code);
   }
 
   Future<void> setGameToActive() async {}

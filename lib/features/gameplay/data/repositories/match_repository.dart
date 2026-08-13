@@ -47,19 +47,28 @@ class MatchRepository {
 
   Future<bool> matchExists(String gameCode) => _datasource.matchExists(gameCode);
 
-  Future<void> insertMatch(GameModel game) async {
-    await _datasource.insertMatch(game.toMap());
-    PlayerMatchModel? host;
-    for (final p in game.players) {
-      if (p.playerId == game.hostId) {
-        host = p;
-        break;
-      }
-    }
-    host ??= game.players.isNotEmpty ? game.players.first : null;
-    if (host?.playerId != null) {
-      await _datasource.insertSeat(host!.toSeatRow(gameCode: game.code));
-    }
+  Future<GameModel> createLobby() async {
+    return assembleBundle(await _datasource.createLobby());
+  }
+
+  Future<GameModel> joinLobby(String gameCode) async {
+    return assembleBundle(await _datasource.joinLobby(gameCode));
+  }
+
+  Future<GameModel> setReady(String gameCode, bool ready) async {
+    return assembleBundle(await _datasource.setReady(gameCode, ready));
+  }
+
+  Future<void> leaveLobby(String gameCode) async {
+    await _datasource.leaveLobby(gameCode);
+  }
+
+  Future<GameModel> kickSeat(String gameCode, String userId) async {
+    return assembleBundle(await _datasource.kickSeat(gameCode, userId));
+  }
+
+  Future<void> cancelLobby(String gameCode) async {
+    await _datasource.cancelLobby(gameCode);
   }
 
   Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) {
@@ -67,24 +76,11 @@ class MatchRepository {
     return _datasource.updateMatch(gameCode, matchPatch);
   }
 
-  Future<void> deleteMatch(String gameCode) => _datasource.deleteMatch(gameCode);
-
-  Future<void> insertSeat(PlayerMatchModel player, {required String gameCode}) {
-    return _datasource.insertSeat(player.toSeatRow(gameCode: gameCode));
-  }
-
-  Future<void> updateSeat(String gameCode, String userId, Map<String, dynamic> patch) {
-    final seatPatch = Map<String, dynamic>.from(patch)..remove('last_seen');
-    return _datasource.updateSeat(gameCode, userId, seatPatch);
-  }
-
   Future<void> heartbeatSeat(String gameCode, String userId, DateTime lastSeen) {
     return _datasource.updateSeat(gameCode, userId, {
       'last_seen': lastSeen.toUtc().toIso8601String(),
     });
   }
-
-  Future<void> deleteSeat(String gameCode, String userId) => _datasource.deleteSeat(gameCode, userId);
 
   Future<GameModel> startMatch(String gameCode) async {
     return assembleBundle(await _datasource.startMatch(gameCode));

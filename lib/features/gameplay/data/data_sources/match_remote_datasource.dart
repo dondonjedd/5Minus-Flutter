@@ -7,25 +7,41 @@ class MatchRemoteDatasource {
 
   Future<bool> matchExists(String gameCode) => SupabaseService.matchExists(gameCode);
 
-  Future<void> insertMatch(Map<String, dynamic> row) => SupabaseService.insertMatch(row);
-
   Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) =>
       SupabaseService.updateMatch(gameCode, patch);
-
-  Future<void> deleteMatch(String gameCode) => SupabaseService.deleteMatch(gameCode);
 
   Stream<Map<String, dynamic>?> watchMatch(String gameCode) => SupabaseService.watchMatch(gameCode);
 
   Future<List<Map<String, dynamic>>> fetchSeats(String gameCode) => SupabaseService.fetchSeats(gameCode);
 
-  Future<void> insertSeat(Map<String, dynamic> row) => SupabaseService.insertSeat(row);
-
   Future<void> updateSeat(String gameCode, String userId, Map<String, dynamic> patch) =>
       SupabaseService.updateSeat(gameCode, userId, patch);
 
-  Future<void> deleteSeat(String gameCode, String userId) => SupabaseService.deleteSeat(gameCode, userId);
-
   Stream<Map<String, dynamic>?> watchSeats(String gameCode) => SupabaseService.watchSeats(gameCode);
+
+  Future<Map<String, dynamic>> createLobby() =>
+      SupabaseService.rpcMatchPlay('create_lobby', const {});
+
+  Future<Map<String, dynamic>> joinLobby(String gameCode) =>
+      SupabaseService.rpcMatchPlay('join_lobby', {'p_code': gameCode});
+
+  Future<Map<String, dynamic>> setReady(String gameCode, bool ready) =>
+      SupabaseService.rpcMatchPlay('set_ready', {
+        'p_code': gameCode,
+        'p_ready': ready,
+      });
+
+  Future<Map<String, dynamic>> leaveLobby(String gameCode) =>
+      SupabaseService.rpcMatchPlay('leave_lobby', {'p_code': gameCode});
+
+  Future<Map<String, dynamic>> kickSeat(String gameCode, String userId) =>
+      SupabaseService.rpcMatchPlay('kick_seat', {
+        'p_code': gameCode,
+        'p_user_id': userId,
+      });
+
+  Future<Map<String, dynamic>> cancelLobby(String gameCode) =>
+      SupabaseService.rpcMatchPlay('cancel_lobby', {'p_code': gameCode});
 
   Future<Map<String, dynamic>> startMatch(String gameCode) =>
       SupabaseService.rpcMatchPlay('start_match', {'p_code': gameCode});

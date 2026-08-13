@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -49,7 +48,6 @@ class LobbyController {
   }
 
   //*******************HOST********************
-  String characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
   //START GAME
   startGame(BuildContext context, {required String? gameCode, required List<PlayerMatchModel>? players}) async {
@@ -69,47 +67,13 @@ class LobbyController {
   deleteGame({required String? gameCode}) async {
     if (gameCode == null) return;
     if (gameCode.isEmpty) return;
-    await _matchRepository.deleteMatch(gameCode);
+    await _matchRepository.cancelLobby(gameCode);
   }
 
   //CREATE GAME
   Future<GameModel> createGame() async {
-    String gameCode = '';
-
-    while (gameCode.isEmpty) {
-      String tmpGamecode = generateGameCode();
-      bool isCodeAvailable = await isGameCodeAvailable(tmpGamecode);
-      if (isCodeAvailable) {
-        gameCode = tmpGamecode;
-      }
-    }
-
-    final hostId = FirebaseAuth.instance.currentUser?.uid;
-
-    if (hostId != null) {
-      final game = GameModel(
-        hostId: hostId,
-        code: gameCode,
-        players: [PlayerMatchModel(playerId: hostId, isReady: true, seat: 0)],
-        gameType: 0,
-        status: 'lobby',
-      );
-      await _matchRepository.insertMatch(game);
-    }
-
-    final gameModel = await _matchRepository.fetchMatch(gameCode) ?? GameModel.fromMap(<String, dynamic>{});
-    return gameModel.copyWith(players: await loadPlayers(gameModel.players));
-  }
-
-  //GENERATE GAME CODE
-  String generateGameCode() {
-    Random random = Random();
-    return String.fromCharCodes(Iterable.generate(4, (_) => characters.codeUnitAt(random.nextInt(characters.length))));
-  }
-
-  //VERIFY IF GAME CODE IS AVAILABLE
-  Future<bool> isGameCodeAvailable(String gameCode) async {
-    return !(await _matchRepository.matchExists(gameCode));
+    final game = await _matchRepository.createLobby();
+    return game.copyWith(players: await loadPlayers(game.players));
   }
 
   //TOGGLE GAME TYPE
@@ -145,50 +109,21 @@ class LobbyController {
 
   //*******************CLIENT********************
 
-  static int lowestFreeSeat(List<PlayerMatchModel> players) {
-    final taken = players.map((p) => p.seat).toSet();
-    var seat = 0;
-    while (taken.contains(seat)) {
-      seat++;
-    }
-    return seat;
-  }
-
   /// Returns a join error message, or null on success.
   Future<String?> joinGameOrError(String gameCode) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return 'Not signed in';
+    if (FirebaseAuth.instance.currentUser?.uid == null) return 'Not signed in';
 
-    for (var attempt = 0; attempt < 2; attempt++) {
-      final existing = await _matchRepository.fetchMatch(gameCode);
-      if (existing == null) return 'Game does not exist';
-
-      if (existing.hasStarted) return 'Game already started';
-
-      if (existing.players.any((p) => p.playerId == userId)) return null;
-
-      if (existing.players.length >= maxPlayers) {
-        return 'Game is full (max $maxPlayers players)';
-      }
-
-      final seat = lowestFreeSeat(existing.players);
-      try {
-        await _matchRepository.insertSeat(
-          PlayerMatchModel(playerId: userId, seat: seat),
-          gameCode: gameCode,
-        );
-        return null;
-      } on ServerException catch (e) {
-        final alreadySeated = e.statusCode == '23505' && e.message.contains('pkey');
-        if (alreadySeated) return null;
-        final seatTaken = e.statusCode == '23505';
-        if (seatTaken && attempt == 0) continue;
-        if (seatTaken) return 'Game is full (max $maxPlayers players)';
-        rethrow;
-      }
+    try {
+      await _matchRepository.joinLobby(gameCode);
+      return null;
+    } on ServerException catch (e) {
+      final message = e.message;
+      if (message.contains('match not found')) return 'Game does not exist';
+      if (message.contains('not in lobby')) return 'Game already started';
+      if (message.contains('match is full')) return 'Game is full (max $maxPlayers players)';
+      if (message.contains('not signed in')) return 'Not signed in';
+      rethrow;
     }
-
-    return 'Game is full (max $maxPlayers players)';
   }
 
   //JOIN GAME
@@ -208,7 +143,7 @@ class LobbyController {
     if (gameCode.length != 4) return;
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId != null) {
-      await _matchRepository.deleteSeat(gameCode, userId);
+      await _matchRepository.leaveLobby(gameCode);
     }
   }
 
@@ -221,9 +156,7 @@ class LobbyController {
     if (userId == null) return;
     final me = playerModelList.firstWhereOrNull((e) => e.playerId == userId);
     if (me == null) return;
-    await _matchRepository.updateSeat(gameCode, userId, {
-      'is_ready': !(me.isReady ?? true),
-    });
+    await _matchRepository.setReady(gameCode, !(me.isReady ?? true));
   }
 
   bool isPlayerReady({required List<PlayerMatchModel>? playerModelList}) {

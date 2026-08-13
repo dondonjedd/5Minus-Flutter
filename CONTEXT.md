@@ -10,7 +10,7 @@ One game row: code, host, turn (a stable seat number), Card piles as jsonb, Matc
 
 ## Match status
 
-`lobby | active | finished` on Match. Replaces `has_started` / `is_active` / `winner` jsonb. Seat insert is lobby-only. Match play runs while active.
+`lobby | active | finished` on Match. Replaces `has_started` / `is_active` / `winner` jsonb. Seat membership is lobby-only. Match play runs while active.
 
 ## Seat
 
@@ -22,8 +22,8 @@ In-memory `PlayerMatchModel` assembled from a Seat, plus `loadedPlayer` (never p
 
 ## Seat membership
 
-Table writes on Seat and Match that are not Match play: lobby insert (own User), `is_ready` (own Seat, lobby only), leave (own Seat, lobby only), host kick (host deletes any Seat in lobby). Host leave in lobby cancels the Match. `last_seen` is writable while seated. Active exit is Match play `forfeit`.
+The Postgres module whose interface is named public moves (`create_lobby`, `join_lobby`, `set_ready`, `leave_lobby`, `kick_seat`, `cancel_lobby`). Lobby-only. `create_lobby` inserts Match and host Seat together. `join_lobby` assigns the next free seat. Host `leave_lobby` or `cancel_lobby` deletes the Match. `kick_seat` is host removing a guest. Each move returns `{ match, seats }` (null if the Match is gone). `last_seen` is a Seat write, not this module. Active exit is Match play `forfeit`. Flutter is an adapter.
 
 ## Match play
 
-The Postgres module whose interface is named public moves (`start_match`, `claim_draw`, `discard_drawn`, `replace_hand`, `eliminate_card`, `swap_hands`, `clear_pending_power`, `declare_challenge`, `end_turn`, `forfeit`, `win_by_disconnect`). Each move mutates Match piles and Seat hands in one transaction and returns `{ match, seats }`. Membership RLS is not this module. Flutter is an adapter.
+The Postgres module whose interface is named public moves (`start_match`, `claim_draw`, `discard_drawn`, `replace_hand`, `eliminate_card`, `swap_hands`, `clear_pending_power`, `declare_challenge`, `end_turn`, `forfeit`, `win_by_disconnect`). Each move mutates Match piles and Seat hands in one transaction and returns `{ match, seats }`. Seat membership is not this module. Flutter is an adapter.
