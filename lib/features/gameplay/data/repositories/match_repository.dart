@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:five_minus/features/gameplay/data/data_sources/match_remote_datasource.dart';
-import 'package:five_minus/features/gameplay/model/game_constants.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
@@ -15,7 +14,7 @@ class MatchRepository {
       ..sort((a, b) => a.seat.compareTo(b.seat));
     var game = GameModel.fromMap(row).copyWith(players: players);
     final winnerId = game.winner?.playerId;
-    if (winnerId != null && winnerId != GameConstants.drawWinnerId) {
+    if (winnerId != null) {
       for (final p in players) {
         if (p.playerId == winnerId) {
           game = game.copyWith(winner: p);
@@ -69,11 +68,6 @@ class MatchRepository {
 
   Future<void> cancelLobby(String gameCode) async {
     await _datasource.cancelLobby(gameCode);
-  }
-
-  Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) {
-    final matchPatch = Map<String, dynamic>.from(patch)..remove('players');
-    return _datasource.updateMatch(gameCode, matchPatch);
   }
 
   Future<void> heartbeatSeat(String gameCode, String userId, DateTime lastSeen) {

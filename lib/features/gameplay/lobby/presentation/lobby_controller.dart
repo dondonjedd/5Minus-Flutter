@@ -76,23 +76,6 @@ class LobbyController {
     return game.copyWith(players: await loadPlayers(game.players));
   }
 
-  //TOGGLE GAME TYPE
-  List<bool> toggleGameTypeLocal({required int? index, required List<bool> selectedGameType}) {
-    List<bool> tmpList = [...selectedGameType];
-    for (int i = 0; i < tmpList.length; i++) {
-      tmpList[i] = i == index;
-    }
-    return tmpList;
-  }
-
-  //TOGGLE GAME TYPE IN SUPABASE
-  Future<void> toggleGameTypeFstore({required String? gameCode, required int gameType}) async {
-    if (gameCode == null) return;
-
-    await _matchRepository.updateMatch(gameCode, {'game_type': gameType});
-    return;
-  }
-
   StreamSubscription<GameModel?>? listenToChanges(
     GameModel? gameModel,
     void Function(GameModel? data, {required bool deleted})? onData,

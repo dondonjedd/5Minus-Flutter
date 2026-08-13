@@ -28,8 +28,8 @@ begin
     ('play-b', 'B'),
     ('play-c', 'C');
 
-  insert into public.matches (game_code, host_id, status, game_type)
-  values ('TSTA', 'play-a', 'lobby', 0);
+  insert into public.matches (game_code, host_id, status)
+  values ('TSTA', 'play-a', 'lobby');
 
   insert into public.match_players (game_code, user_id, seat, is_ready)
   values

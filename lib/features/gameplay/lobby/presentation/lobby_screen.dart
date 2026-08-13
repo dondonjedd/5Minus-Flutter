@@ -79,7 +79,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
       previous: gameModel?.players,
     );
 
-    gameModel = data.copyWith(gameType: data.gameType, players: tmpList);
+    gameModel = data.copyWith(players: tmpList);
 
     if (gameModel?.hasStarted ?? false) {
       if (!context.mounted) return;

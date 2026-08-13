@@ -6,11 +6,15 @@ A person identified by Firebase UID. That string is `users.id`, Seat `user_id`, 
 
 ## Match
 
-One game row: code, host, turn (a stable seat number), Card piles as jsonb, Match status, and match-wide flags. Membership is not part of a Match.
+One game row: code, host, turn (a stable seat number), Card piles as jsonb, Match status, and Match result. Membership is not part of a Match.
 
 ## Match status
 
 `lobby | active | finished` on Match. Replaces `has_started` / `is_active` / `winner` jsonb. Seat membership is lobby-only. Match play runs while active.
+
+## Match result
+
+`winner_user_id` (nullable User), `end_reason`, and `ended_at` on Match. Lobby and active rows have all three null. Finished rows have `end_reason` and `ended_at`. A draw is `end_reason = challenge_tie` with a null winner; any other reason requires a winner. Replaces `winner` jsonb and the `__DRAW__` sentinel.
 
 ## Seat
 

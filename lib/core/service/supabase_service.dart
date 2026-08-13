@@ -70,20 +70,6 @@ class SupabaseService {
     }
   }
 
-  static Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) async {
-    try {
-      await _client.from('matches').update(patch).eq('game_code', gameCode);
-    } on ServerException {
-      rethrow;
-    } catch (e) {
-      throw ServerException(
-        title: 'Match update error',
-        message: e.toString(),
-        statusCode: '999',
-      );
-    }
-  }
-
   static Future<Map<String, dynamic>> rpcMatchPlay(
     String functionName,
     Map<String, dynamic> params,

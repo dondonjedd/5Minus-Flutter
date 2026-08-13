@@ -47,7 +47,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
   bool get isMatchOver => state?.winner != null || state?.status == 'finished';
 
-  bool get isDraw => state?.winner?.playerId == GameConstants.drawWinnerId;
+  bool get isDraw => state?.endReason == EndReason.challengeTie;
 
   Future<void> initalize(String? gameCode) async {
     if (gameCode == null) return;

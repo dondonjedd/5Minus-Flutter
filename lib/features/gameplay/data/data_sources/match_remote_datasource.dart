@@ -7,9 +7,6 @@ class MatchRemoteDatasource {
 
   Future<bool> matchExists(String gameCode) => SupabaseService.matchExists(gameCode);
 
-  Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) =>
-      SupabaseService.updateMatch(gameCode, patch);
-
   Stream<Map<String, dynamic>?> watchMatch(String gameCode) => SupabaseService.watchMatch(gameCode);
 
   Future<List<Map<String, dynamic>>> fetchSeats(String gameCode) => SupabaseService.fetchSeats(gameCode);

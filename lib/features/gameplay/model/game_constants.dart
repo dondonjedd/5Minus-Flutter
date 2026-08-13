@@ -5,7 +5,6 @@ class GameConstants {
   static const int maxPenalties = 3;
   static const int challengePointLimit = 5; // win if total <= 5
   static const int reconnectTimeoutSeconds = 60;
-  static const String drawWinnerId = '__DRAW__';
 }
 
 /// Stored on Match as `end_reason`.
