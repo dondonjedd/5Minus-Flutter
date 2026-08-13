@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/core/component/template/authentication/model/user_model.dart';
-import 'package:five_minus/core/service/supabase_service.dart';
+import 'package:five_minus/core/data/datasource/user_remote_datasource.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -8,7 +8,11 @@ import '../../../../../errors/exceptions.dart';
 import '../../../../../utility/network_utility.dart';
 
 class AuthNetworkDatasource {
-  const AuthNetworkDatasource();
+  const AuthNetworkDatasource({
+    UserRemoteDatasource userRemoteDatasource = const UserRemoteDatasource(),
+  }) : _userRemoteDatasource = userRemoteDatasource;
+
+  final UserRemoteDatasource _userRemoteDatasource;
 
   Future<UserModel?> signInEmailPassword({required String emailAddress, required String password}) async {
     try {
@@ -40,7 +44,7 @@ class AuthNetworkDatasource {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return null;
-      final data = await SupabaseService.fetchUser(uid);
+      final data = await _userRemoteDatasource.fetchUser(uid);
       if (data == null) {
         return _createUser();
       }
@@ -55,7 +59,7 @@ class AuthNetworkDatasource {
       if (usermodel == null) return null;
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return null;
-      await SupabaseService.upsertUser({
+      await _userRemoteDatasource.upsertUser({
         'id': uid,
         'player_id': uid,
         ...usermodel.toSupabaseMap(),
@@ -119,12 +123,12 @@ class AuthNetworkDatasource {
       if (uid == null) return null;
 
       final base = UserModel.baseUserModel();
-      await SupabaseService.upsertUser({
+      await _userRemoteDatasource.upsertUser({
         'id': uid,
         'player_id': uid,
         ...base.toSupabaseMap(),
       });
-      final data = await SupabaseService.fetchUser(uid);
+      final data = await _userRemoteDatasource.fetchUser(uid);
       return UserModel.fromMap(data);
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');

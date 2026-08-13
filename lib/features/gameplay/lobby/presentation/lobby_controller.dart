@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/core/service/supabase_service.dart';
-import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
+import 'package:five_minus/features/auth_game_services/data/repositories/user_repository.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/active_game_controller.dart';
+import 'package:five_minus/features/gameplay/data/repositories/match_repository.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/lobby_params.dart';
@@ -28,7 +29,14 @@ class LobbyController {
     );
   }
 
-  LobbyController._();
+  LobbyController._({
+    MatchRepository? matchRepository,
+    UserRepository? userRepository,
+  })  : _matchRepository = matchRepository ?? MatchRepository(),
+        _userRepository = userRepository ?? UserRepository();
+
+  final MatchRepository _matchRepository;
+  final UserRepository _userRepository;
 
   /// Pre-lobby join validation (full / started / missing).
   static Future<String?> joinGate(String gameCode) => LobbyController._().joinGameOrError(gameCode);
@@ -48,7 +56,7 @@ class LobbyController {
     if ((players?.length ?? 0) != maxPlayers) return;
     if (players!.any((p) => !(p.isReady ?? false))) return;
 
-    await SupabaseService.updateMatch(gameCode, {'has_started': true});
+    await _matchRepository.updateMatch(gameCode, {'has_started': true});
 
     if (!context.mounted) return;
     navigateActiveGame(context, gameCode: gameCode);
@@ -60,7 +68,7 @@ class LobbyController {
   deleteGame({required String? gameCode}) async {
     if (gameCode == null) return;
     if (gameCode.isEmpty) return;
-    await SupabaseService.deleteMatch(gameCode);
+    await _matchRepository.deleteMatch(gameCode);
   }
 
   //CREATE GAME
@@ -86,12 +94,11 @@ class LobbyController {
         isActive: false,
         hasStarted: false,
       );
-      await SupabaseService.insertMatch(game.toMap());
+      await _matchRepository.insertMatch(game);
     }
 
-    final data = await SupabaseService.fetchMatch(gameCode);
-    GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(data ?? {}));
-    return gameModel.copyWith(players: await _loadPlayers(gameModel.players));
+    final gameModel = await _matchRepository.fetchMatch(gameCode) ?? GameModel.fromMap(<String, dynamic>{});
+    return gameModel.copyWith(players: await loadPlayers(gameModel.players));
   }
 
   //GENERATE GAME CODE
@@ -102,7 +109,7 @@ class LobbyController {
 
   //VERIFY IF GAME CODE IS AVAILABLE
   Future<bool> isGameCodeAvailable(String gameCode) async {
-    return !(await SupabaseService.matchExists(gameCode));
+    return !(await _matchRepository.matchExists(gameCode));
   }
 
   //TOGGLE GAME TYPE
@@ -118,18 +125,18 @@ class LobbyController {
   Future<void> toggleGameTypeFstore({required String? gameCode, required int gameType}) async {
     if (gameCode == null) return;
 
-    await SupabaseService.updateMatch(gameCode, {'game_type': gameType});
+    await _matchRepository.updateMatch(gameCode, {'game_type': gameType});
     return;
   }
 
-  StreamSubscription<Map<String, dynamic>?>? listenToChanges(
+  StreamSubscription<GameModel?>? listenToChanges(
     GameModel? gameModel,
-    void Function(Map<String, dynamic>? data, {required bool deleted})? onData,
+    void Function(GameModel? data, {required bool deleted})? onData,
   ) {
     final code = gameModel?.code;
     if (code == null || onData == null) return null;
 
-    return SupabaseService.watchMatch(code).listen((data) {
+    return _matchRepository.watchMatch(code).listen((data) {
       onData(data, deleted: data == null);
     });
   }
@@ -143,22 +150,21 @@ class LobbyController {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return 'Not signed in';
 
-    final existing = await SupabaseService.fetchMatch(gameCode);
+    final existing = await _matchRepository.fetchMatch(gameCode);
     if (existing == null) return 'Game does not exist';
 
-    final gameModel = GameModel.fromMap(Map<String, dynamic>.from(existing));
-    if (gameModel.hasStarted) return 'Game already started';
+    if (existing.hasStarted) return 'Game already started';
 
-    final alreadyJoined = gameModel.players.any((p) => p.playerId == userId);
+    final alreadyJoined = existing.players.any((p) => p.playerId == userId);
     if (!alreadyJoined) {
-      if (gameModel.players.length >= maxPlayers) {
+      if (existing.players.length >= maxPlayers) {
         return 'Game is full (max $maxPlayers players)';
       }
       final players = [
-        ...gameModel.players.map((e) => e.toMap()),
+        ...existing.players.map((e) => e.toMap()),
         PlayerMatchModel(playerId: userId).toMap(),
       ];
-      await SupabaseService.updateMatch(gameCode, {'players': players});
+      await _matchRepository.updateMatch(gameCode, {'players': players});
     }
 
     return null;
@@ -171,9 +177,8 @@ class LobbyController {
       throw StateError(error);
     }
 
-    final data = await SupabaseService.fetchMatch(gameCode);
-    GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(data ?? {}));
-    return gameModel.copyWith(players: await _loadPlayers(gameModel.players));
+    final gameModel = await _matchRepository.fetchMatch(gameCode) ?? GameModel.fromMap(<String, dynamic>{});
+    return gameModel.copyWith(players: await loadPlayers(gameModel.players));
   }
 
   //LEAVE GAME
@@ -187,7 +192,7 @@ class LobbyController {
       },
     );
     if (userId != null) {
-      await SupabaseService.updateMatch(gameCode, {
+      await _matchRepository.updateMatch(gameCode, {
         'players': playerModelList.map((e) => e.toMap()).toList(),
       });
     }
@@ -208,7 +213,7 @@ class LobbyController {
       },
     ).toList();
     if (userId != null) {
-      await SupabaseService.updateMatch(gameCode, {
+      await _matchRepository.updateMatch(gameCode, {
         'players': playerModelList.map((e) => e.toMap()).toList(),
       });
     }
@@ -227,21 +232,37 @@ class LobbyController {
         false;
   }
 
-  Future<List<PlayerMatchModel>> _loadPlayers(List<PlayerMatchModel> players) async {
+  Future<List<PlayerMatchModel>> loadPlayers(List<PlayerMatchModel> players) async {
     final List<PlayerMatchModel> loaded = [];
     for (final e in players) {
       if (e.loadedPlayer != null || e.playerId == null) {
         loaded.add(e);
         continue;
       }
-      final data = await SupabaseService.fetchUser(e.playerId!);
-      loaded.add(
-        e.copyWith(
-          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data),
-        ),
-      );
+      final user = await _userRepository.fetchFirebaseUser(e.playerId!);
+      loaded.add(e.copyWith(loadedPlayer: user));
     }
     return loaded;
+  }
+
+  /// Preserve already-loaded profiles when applying a realtime lobby update.
+  Future<List<PlayerMatchModel>> mergePlayersWithProfiles(
+    List<PlayerMatchModel> incoming, {
+    List<PlayerMatchModel>? previous,
+  }) async {
+    final List<PlayerMatchModel> tmpList = [];
+    for (final element in incoming) {
+      final matchingElement = previous?.firstWhereOrNull((el2) => el2 == element);
+      if (matchingElement != null) {
+        tmpList.add(matchingElement);
+      } else if (element.playerId != null) {
+        final user = await _userRepository.fetchFirebaseUser(element.playerId!);
+        tmpList.add(element.copyWith(loadedPlayer: user));
+      } else {
+        tmpList.add(element);
+      }
+    }
+    return tmpList;
   }
 
   //*******************CLIENT********************

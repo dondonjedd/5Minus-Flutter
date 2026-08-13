@@ -1,12 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:collection/collection.dart';
-import 'package:five_minus/core/service/supabase_service.dart';
-import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/lobby_params.dart';
-import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
@@ -26,7 +22,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   bool isLoading = false;
   GameModel? gameModel;
   bool isHost = false;
-  StreamSubscription<Map<String, dynamic>?>? _gameSubscription;
+  StreamSubscription<GameModel?>? _gameSubscription;
   @override
   void dispose() {
     _gameSubscription?.cancel();
@@ -70,35 +66,19 @@ class _LobbyScreenState extends State<LobbyScreen> {
     super.initState();
   }
 
-  void _updateLocalFromSupabase(Map<String, dynamic>? data, {required bool deleted}) async {
+  void _updateLocalFromSupabase(GameModel? data, {required bool deleted}) async {
     if (deleted || data == null) {
       if (!context.mounted) return;
       widget.controller.navigateDashboard(context);
       return;
     }
 
-    GameModel tempGameModel = GameModel.fromMap(data);
+    final tmpList = await widget.controller.mergePlayersWithProfiles(
+      data.players,
+      previous: gameModel?.players,
+    );
 
-    List<PlayerMatchModel> tmpList = [];
-
-    for (PlayerMatchModel element in tempGameModel.players) {
-      PlayerMatchModel? matchingElement = gameModel?.players.firstWhereOrNull((el2) => el2 == element);
-
-      if (matchingElement != null) {
-        tmpList.add(matchingElement);
-      } else if (element.playerId != null) {
-        final userData = await SupabaseService.fetchUser(element.playerId!);
-        tmpList.add(
-          element.copyWith(
-            loadedPlayer: userData == null ? null : FirebaseUserModel.fromMap(userData),
-          ),
-        );
-      } else {
-        tmpList.add(element);
-      }
-    }
-
-    gameModel = tempGameModel.copyWith(gameType: tempGameModel.gameType, players: tmpList);
+    gameModel = data.copyWith(gameType: data.gameType, players: tmpList);
 
     if (gameModel?.hasStarted ?? false) {
       if (!context.mounted) return;

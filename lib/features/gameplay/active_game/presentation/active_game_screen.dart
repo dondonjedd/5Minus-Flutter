@@ -32,7 +32,7 @@ class ActiveGameScreen extends StatefulWidget {
 class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool isLoading = false;
   bool isHost = false;
-  StreamSubscription<Map<String, dynamic>?>? _gameSubscription;
+  StreamSubscription<GameModel?>? _gameSubscription;
   int? userIndex;
   Timer? _heartbeat;
   Timer? _reconnectCheck;

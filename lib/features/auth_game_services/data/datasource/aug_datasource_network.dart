@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/core/data/configuration_data.dart';
-import 'package:five_minus/core/service/supabase_service.dart';
+import 'package:five_minus/core/data/datasource/user_remote_datasource.dart';
 import 'package:five_minus/features/auth_game_services/model/firebase_user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:games_services/games_services.dart';
@@ -8,7 +8,11 @@ import 'package:games_services/games_services.dart';
 import '../../../../core/errors/exceptions.dart';
 
 class AugNetworkDatasource {
-  const AugNetworkDatasource();
+  const AugNetworkDatasource({
+    UserRemoteDatasource userRemoteDatasource = const UserRemoteDatasource(),
+  }) : _userRemoteDatasource = userRemoteDatasource;
+
+  final UserRemoteDatasource _userRemoteDatasource;
 
   Future<void> signInPlayGamesServices() async {
     try {
@@ -37,7 +41,7 @@ class AugNetworkDatasource {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return null;
 
-      await SupabaseService.upsertUser(model.toMap(id: uid));
+      await _userRemoteDatasource.upsertUser(model.toMap(id: uid));
       return await getUserModel(uid);
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
@@ -48,7 +52,7 @@ class AugNetworkDatasource {
 
   Future<FirebaseUserModel?> getUserModel(String uid) async {
     try {
-      final data = await SupabaseService.fetchUser(uid);
+      final data = await _userRemoteDatasource.fetchUser(uid);
       if (data == null) return null;
       return FirebaseUserModel.fromMap(data);
     } catch (e) {

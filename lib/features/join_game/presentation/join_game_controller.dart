@@ -1,6 +1,6 @@
-import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/core/utility/dialog_utility.dart';
 import 'package:five_minus/core/utility/loading_overlay_utility.dart';
+import 'package:five_minus/features/gameplay/data/repositories/match_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +13,11 @@ class JoinGameController {
   static Widget screen() {
     return JoinGameScreen(controller: JoinGameController._());
   }
+
+  JoinGameController._({MatchRepository? matchRepository})
+      : _matchRepository = matchRepository ?? MatchRepository();
+
+  final MatchRepository _matchRepository;
 
   joinGame(BuildContext context, String gameCode) async {
     LoadingOverlay().show(context);
@@ -28,8 +33,6 @@ class JoinGameController {
 
   //VERIFY IF GAME EXISTS
   Future<bool> isGameExist(String gameCode) async {
-    return SupabaseService.matchExists(gameCode);
+    return _matchRepository.matchExists(gameCode);
   }
-
-  JoinGameController._();
 }

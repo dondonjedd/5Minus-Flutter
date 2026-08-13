@@ -1,19 +1,27 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:five_minus/core/service/supabase_service.dart';
+import 'package:five_minus/features/auth_game_services/data/repositories/user_repository.dart';
+import 'package:five_minus/features/gameplay/data/repositories/match_repository.dart';
 import 'package:five_minus/features/gameplay/enums/enum_card_power.dart';
 import 'package:five_minus/features/gameplay/model/game_constants.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../auth_game_services/model/firebase_user_model.dart';
 import '../../../model/card_model.dart';
 import '../../../model/deck_model.dart';
 import '../../../model/player_match_model.dart';
 
 class MatchCubit extends Cubit<GameModel?> {
-  MatchCubit() : super(null);
+  MatchCubit({
+    MatchRepository? matchRepository,
+    UserRepository? userRepository,
+  })  : _matchRepository = matchRepository ?? MatchRepository(),
+        _userRepository = userRepository ?? UserRepository(),
+        super(null);
+
+  final MatchRepository _matchRepository;
+  final UserRepository _userRepository;
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
@@ -45,8 +53,8 @@ class MatchCubit extends Cubit<GameModel?> {
   Future<void> initalize(String? gameCode) async {
     if (gameCode == null) return;
 
-    final row = await SupabaseService.fetchMatch(gameCode);
-    GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(row ?? {}));
+    final fetched = await _matchRepository.fetchMatch(gameCode);
+    GameModel gameModel = fetched ?? GameModel.fromMap(<String, dynamic>{});
 
     final alreadyDealt = gameModel.drawDeck?.cardDeck?.isNotEmpty == true ||
         (gameModel.players.isNotEmpty && (gameModel.players.first.playerHand?.isNotEmpty ?? false));
@@ -72,7 +80,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
       gameModel = gameModel.copyWith(players: dealtPlayers, isActive: true);
 
-      await SupabaseService.updateMatch(gameCode, {
+      await _matchRepository.updateMatch(gameCode, {
         'draw_deck': deck.toMapList(),
         'discard_deck': [],
         'players': gameModel.players.map((e) => e.toMap()).toList(),
@@ -87,8 +95,8 @@ class MatchCubit extends Cubit<GameModel?> {
       });
     }
 
-    final refreshed = await SupabaseService.fetchMatch(gameCode);
-    final parsed = GameModel.fromMap(Map<String, dynamic>.from(refreshed ?? {}));
+    final refreshed = await _matchRepository.fetchMatch(gameCode);
+    final parsed = refreshed ?? GameModel.fromMap(<String, dynamic>{});
     final players = await _loadPlayers(parsed.players);
     emit(parsed.copyWith(players: players));
     await ensureAutoDraw();
@@ -103,13 +111,13 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> deleteGame() async {
     if (state?.code.isEmpty ?? true) return;
-    await SupabaseService.deleteMatch(state!.code);
+    await _matchRepository.deleteMatch(state!.code);
   }
 
   Future<void> setGameToActive() async {
     if (state?.code == null) return;
     emit(state?.copyWith(isActive: true));
-    await SupabaseService.updateMatch(state!.code, {'is_active': true});
+    await _matchRepository.updateMatch(state!.code, {'is_active': true});
   }
 
   bool isMyTurn() {
@@ -151,16 +159,14 @@ class MatchCubit extends Cubit<GameModel?> {
 
       final code = game.code;
       // Conditional update: only the client that wins drawn_card IS NULL proceeds.
-      final row = await SupabaseService.updateMatchIfDrawnCardNull(code, {
+      final parsed = await _matchRepository.updateMatchIfDrawnCardNull(code, {
         'drawn_card': card.toMap(),
         'draw_deck': game.drawDeck?.toMapList(),
         'discard_deck': game.discardDeck?.toMapList(),
       });
 
-      if (row == null) return;
+      if (parsed == null) return;
       if (state?.code != code) return;
-
-      final parsed = GameModel.fromMap(row);
       final players = parsed.players.asMap().entries.map((e) {
         final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
         final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
@@ -507,7 +513,7 @@ class MatchCubit extends Cubit<GameModel?> {
       isActive: false,
       isChallengeComplete: true,
     );
-    await SupabaseService.updateMatch(game.code, {
+    await _matchRepository.updateMatch(game.code, {
       'winner': {
         ...winner.toMap(),
         'end_reason': reason,
@@ -528,7 +534,7 @@ class MatchCubit extends Cubit<GameModel?> {
       isActive: false,
       isChallengeComplete: true,
     );
-    await SupabaseService.updateMatch(game.code, {
+    await _matchRepository.updateMatch(game.code, {
       'winner': {
         ...draw.toMap(),
         'end_reason': reason,
@@ -578,10 +584,10 @@ class MatchCubit extends Cubit<GameModel?> {
 
     // Read-merge-write so a stale local snapshot cannot clobber turn resets
     // (actionsComplete / eliminationLocked) written by the other client.
-    final row = await SupabaseService.fetchMatch(code);
-    if (row == null || state?.code != code) return;
+    final match = await _matchRepository.fetchMatch(code);
+    if (match == null || state?.code != code) return;
 
-    final remote = (row['players'] as List<dynamic>? ?? []).map((e) => PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map))).toList();
+    final remote = match.players;
     if (idx >= remote.length) return;
 
     final merged = remote.asMap().entries.map((e) {
@@ -591,7 +597,7 @@ class MatchCubit extends Cubit<GameModel?> {
     }).toList();
 
     merged[idx] = merged[idx].copyWith(lastSeen: DateTime.now().toUtc().toIso8601String());
-    await SupabaseService.updateMatch(code, {
+    await _matchRepository.updateMatch(code, {
       'players': merged.map((e) => e.toMap()).toList(),
     });
 
@@ -661,7 +667,7 @@ class MatchCubit extends Cubit<GameModel?> {
       map['winner'] = game.winner!.toMap();
     }
 
-    await SupabaseService.updateMatch(game.code, map);
+    await _matchRepository.updateMatch(game.code, map);
 
     final players = game.players.asMap().entries.map((e) {
       final loaded = state?.players.length == game.players.length ? state!.players[e.key].loadedPlayer : null;
@@ -684,25 +690,32 @@ class MatchCubit extends Cubit<GameModel?> {
     final userId = _uid;
     final players = List<PlayerMatchModel>.from(state!.players)..removeWhere((e) => e.playerId == userId);
     if (userId != null) {
-      await SupabaseService.updateMatch(state!.code, {
+      await _matchRepository.updateMatch(state!.code, {
         'players': players.map((e) => e.toMap()).toList(),
       });
     }
   }
 
-  bool updateFromSupabase(Map<String, dynamic>? data, {required bool deleted}) {
+  bool updateFromSupabase(GameModel? data, {required bool deleted}) {
     if (deleted || data == null) return false;
-    final parsed = GameModel.fromMap(data);
-    final players = parsed.players.asMap().entries.map((e) {
+    final players = data.players.asMap().entries.map((e) {
       final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
       final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
       return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
     }).toList();
-    emit(parsed.copyWith(players: players));
+    emit(data.copyWith(players: players));
     if (needsAutoDraw) {
       unawaited(ensureAutoDraw());
     }
     return true;
+  }
+
+  StreamSubscription<GameModel?>? watchMatch(void Function(GameModel? game, {required bool deleted}) onData) {
+    final code = state?.code;
+    if (code == null) return null;
+    return _matchRepository.watchMatch(code).listen((game) {
+      onData(game, deleted: game == null);
+    });
   }
 
   // Legacy API used by old drag-discard UI
@@ -733,12 +746,8 @@ class MatchCubit extends Cubit<GameModel?> {
         loaded.add(e);
         continue;
       }
-      final data = await SupabaseService.fetchUser(e.playerId!);
-      loaded.add(
-        e.copyWith(
-          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data),
-        ),
-      );
+      final user = await _userRepository.fetchFirebaseUser(e.playerId!);
+      loaded.add(e.copyWith(loadedPlayer: user));
     }
     return loaded;
   }

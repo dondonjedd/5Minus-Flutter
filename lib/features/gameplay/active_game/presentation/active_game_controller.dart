@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:five_minus/core/service/supabase_service.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
+import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -25,16 +25,10 @@ class ActiveGameController {
 
   ActiveGameController._();
 
-  StreamSubscription<Map<String, dynamic>?>? listenToChanges(BuildContext context) {
-    MatchCubit matchCubit = context.read<MatchCubit>();
-    final code = matchCubit.state?.code;
-    if (code == null) return null;
-
-    return SupabaseService.watchMatch(code).listen((data) {
-      final isGameExist = matchCubit.updateFromSupabase(
-        data,
-        deleted: data == null,
-      );
+  StreamSubscription<GameModel?>? listenToChanges(BuildContext context) {
+    final matchCubit = context.read<MatchCubit>();
+    return matchCubit.watchMatch((game, {required deleted}) {
+      final isGameExist = matchCubit.updateFromSupabase(game, deleted: deleted);
       if (!isGameExist) {
         if (context.mounted) navigateDashboard(context);
       }
