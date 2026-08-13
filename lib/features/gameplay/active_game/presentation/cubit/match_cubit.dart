@@ -83,7 +83,6 @@ class MatchCubit extends Cubit<GameModel?> {
       await _matchRepository.updateMatch(gameCode, {
         'draw_deck': deck.toMapList(),
         'discard_deck': [],
-        'players': gameModel.players.map((e) => e.toMap()).toList(),
         'turn': 0,
         'drawn_card': null,
         'is_active': true,
@@ -93,6 +92,10 @@ class MatchCubit extends Cubit<GameModel?> {
         // Wall-clock turn start so every client can derive the same timer progress.
         'turn_start_time': DateTime.now().toUtc().toIso8601String(),
       });
+      for (final p in gameModel.players) {
+        if (p.playerId == null) continue;
+        await _matchRepository.updateSeat(gameCode, p.playerId!, p.toSeatPatch());
+      }
     }
 
     final refreshed = await _matchRepository.fetchMatch(gameCode);
@@ -121,9 +124,9 @@ class MatchCubit extends Cubit<GameModel?> {
   }
 
   bool isMyTurn() {
-    final idx = getUserIndex();
-    if (idx == null || state?.turn == null) return false;
-    return state!.turn == idx;
+    final me = _me();
+    if (me == null || state?.turn == null) return false;
+    return state!.turn == me.seat;
   }
 
   bool canDraw() {
@@ -138,9 +141,10 @@ class MatchCubit extends Cubit<GameModel?> {
     final game = state;
     if (game == null || isMatchOver || !game.isActive || hasPendingPower) return false;
     final turn = game.turn;
-    if (turn == null || turn < 0 || turn >= game.players.length) return false;
+    final active = _playerAtSeat(game, turn);
+    if (active == null) return false;
     if (game.drawnCard != null) return false;
-    if (game.players[turn].actionsComplete) return false;
+    if (active.actionsComplete) return false;
     return true;
   }
 
@@ -167,12 +171,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
       if (parsed == null) return;
       if (state?.code != code) return;
-      final players = parsed.players.asMap().entries.map((e) {
-        final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
-        final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
-        return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
-      }).toList();
-      emit(parsed.copyWith(players: players));
+      emit(parsed.copyWith(players: _mergeLoadedPlayers(parsed.players)));
     } finally {
       _autoDrawInFlight = false;
     }
@@ -218,6 +217,7 @@ class MatchCubit extends Cubit<GameModel?> {
       game.copyWith(drawnCard: card, drawDeck: game.drawDeck),
       clearDrawnCard: false,
       includeDrawnCard: true,
+      seatsToWrite: const [],
     );
   }
 
@@ -266,7 +266,13 @@ class MatchCubit extends Cubit<GameModel?> {
       players = List<PlayerMatchModel>.from(game.players);
       players[playerIndex] = players[playerIndex].copyWith(actionsComplete: true);
       game = game.copyWith(players: players, powerStartTime: null);
-      await _persist(game, clearDrawnCard: true, includeDrawnCard: true, clearPowerTime: true);
+      await _persist(
+        game,
+        clearDrawnCard: true,
+        includeDrawnCard: true,
+        clearPowerTime: true,
+        seatsToWrite: [playerIndex, opponentOf(playerIndex)],
+      );
       await _checkEmptyHandWin(playerIndex);
       return;
     }
@@ -277,13 +283,24 @@ class MatchCubit extends Cubit<GameModel?> {
         players: players,
         powerStartTime: DateTime.now().toUtc(),
       );
-      await _persist(game, clearDrawnCard: true, includeDrawnCard: true);
+      await _persist(
+        game,
+        clearDrawnCard: true,
+        includeDrawnCard: true,
+        seatsToWrite: [playerIndex],
+      );
       return;
     }
 
     players[playerIndex] = players[playerIndex].copyWith(actionsComplete: true);
     game = game.copyWith(players: players, powerStartTime: null);
-    await _persist(game, clearDrawnCard: true, includeDrawnCard: true, clearPowerTime: true);
+    await _persist(
+      game,
+      clearDrawnCard: true,
+      includeDrawnCard: true,
+      clearPowerTime: true,
+      seatsToWrite: [playerIndex],
+    );
     await _checkEmptyHandWin(playerIndex);
   }
 
@@ -336,13 +353,17 @@ class MatchCubit extends Cubit<GameModel?> {
     }
 
     game = game.copyWith(players: players, powerStartTime: null);
-    await _persist(game, clearPowerTime: true);
+    await _persist(
+      game,
+      clearPowerTime: true,
+      seatsToWrite: {playerIndexA, playerIndexB}.toList(),
+    );
   }
 
   Future<void> _clearPendingPower() async {
     if (state?.code == null) return;
     final game = state!.copyWith(powerStartTime: null);
-    await _persist(game, clearPowerTime: true);
+    await _persist(game, clearPowerTime: true, seatsToWrite: const []);
   }
 
   /// Attempt to eliminate a face-down hand card against the top discard rank.
@@ -395,9 +416,9 @@ class MatchCubit extends Cubit<GameModel?> {
 
     final gameSnapshot = _cloneState();
     final current = gameSnapshot.turn ?? 0;
-    final othersAlreadyChallenged = gameSnapshot.players.asMap().entries.any(
-          (e) => e.key != current && (e.value.isChallengedDeclard ?? false),
-        );
+    final othersAlreadyChallenged = gameSnapshot.players.any(
+      (p) => p.seat != current && (p.isChallengedDeclard ?? false),
+    );
 
     // Response turn finished → resolve challenges before advancing.
     if (othersAlreadyChallenged) {
@@ -408,11 +429,13 @@ class MatchCubit extends Cubit<GameModel?> {
     var game = _cloneState();
     final newTurn = current == 1 ? 0 : 1;
     var players = List<PlayerMatchModel>.from(game.players);
-    if (current < players.length) {
-      players[current] = players[current].copyWith(actionsComplete: false);
+    final currentIdx = _indexForSeat(players, current);
+    final newIdx = _indexForSeat(players, newTurn);
+    if (currentIdx != null) {
+      players[currentIdx] = players[currentIdx].copyWith(actionsComplete: false);
     }
-    if (newTurn < players.length) {
-      players[newTurn] = players[newTurn].copyWith(
+    if (newIdx != null) {
+      players[newIdx] = players[newIdx].copyWith(
         actionsComplete: false,
         eliminationLocked: false,
       );
@@ -427,7 +450,22 @@ class MatchCubit extends Cubit<GameModel?> {
       drawnCard: null,
       powerStartTime: null,
     );
-    await _persist(game, clearDrawnCard: true, includeDrawnCard: true, clearPowerTime: true);
+    await _persist(
+      game,
+      clearDrawnCard: true,
+      includeDrawnCard: true,
+      clearPowerTime: true,
+      seatsToWrite: [if (currentIdx != null) currentIdx],
+    );
+    if (newIdx != null) {
+      final next = game.players[newIdx];
+      if (next.playerId != null) {
+        await _matchRepository.updateSeat(game.code, next.playerId!, {
+          'actions_complete': false,
+          'elimination_locked': false,
+        });
+      }
+    }
     await ensureAutoDraw();
   }
 
@@ -451,7 +489,7 @@ class MatchCubit extends Cubit<GameModel?> {
           players[j] = players[j].copyWith(isChallengedDeclard: false);
         }
         g = g.copyWith(players: players, isChallengeComplete: true);
-        await _persist(g);
+        await _persist(g, seatsToWrite: List<int>.generate(players.length, (i) => i));
         if (_isDisqualified(g.players[i])) {
           await _endAsWinner(opponentOf(i), EndReason.penalties);
         }
@@ -520,7 +558,6 @@ class MatchCubit extends Cubit<GameModel?> {
       },
       'is_active': false,
       'is_challenge_complete': true,
-      'players': game.players.map((e) => e.toMap()).toList(),
     });
     emit(game);
   }
@@ -578,31 +615,16 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> heartbeat() async {
     if (state?.code == null) return;
+    final userId = _uid;
     final idx = getUserIndex();
-    if (idx == null) return;
+    if (userId == null || idx == null) return;
     final code = state!.code;
-
-    // Read-merge-write so a stale local snapshot cannot clobber turn resets
-    // (actionsComplete / eliminationLocked) written by the other client.
-    final match = await _matchRepository.fetchMatch(code);
-    if (match == null || state?.code != code) return;
-
-    final remote = match.players;
-    if (idx >= remote.length) return;
-
-    final merged = remote.asMap().entries.map((e) {
-      final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
-      final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
-      return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
-    }).toList();
-
-    merged[idx] = merged[idx].copyWith(lastSeen: DateTime.now().toUtc().toIso8601String());
-    await _matchRepository.updateMatch(code, {
-      'players': merged.map((e) => e.toMap()).toList(),
-    });
-
+    final lastSeen = DateTime.now().toUtc();
+    await _matchRepository.heartbeatSeat(code, userId, lastSeen);
     if (state?.code != code) return;
-    emit(state!.copyWith(players: merged));
+    final players = List<PlayerMatchModel>.from(state!.players);
+    players[idx] = players[idx].copyWith(lastSeen: lastSeen.toIso8601String());
+    emit(state!.copyWith(players: players));
   }
 
   /// Returns true if opponent has been gone longer than reconnect timeout.
@@ -643,11 +665,11 @@ class MatchCubit extends Cubit<GameModel?> {
     bool clearDrawnCard = false,
     bool includeDrawnCard = false,
     bool clearPowerTime = false,
+    List<int>? seatsToWrite,
   }) async {
     final map = <String, dynamic>{
       'draw_deck': game.drawDeck?.toMapList(),
       'discard_deck': game.discardDeck?.toMapList(),
-      'players': game.players.map((e) => e.toMap()).toList(),
       'turn': game.turn,
       'is_challenge_complete': game.isChallengeComplete,
       'is_active': game.isActive,
@@ -669,12 +691,15 @@ class MatchCubit extends Cubit<GameModel?> {
 
     await _matchRepository.updateMatch(game.code, map);
 
-    final players = game.players.asMap().entries.map((e) {
-      final loaded = state?.players.length == game.players.length ? state!.players[e.key].loadedPlayer : null;
-      return e.value.copyWith(loadedPlayer: e.value.loadedPlayer ?? loaded);
-    }).toList();
+    final dirty = seatsToWrite ?? [if (getUserIndex() != null) getUserIndex()!];
+    for (final i in dirty.toSet()) {
+      if (i < 0 || i >= game.players.length) continue;
+      final p = game.players[i];
+      if (p.playerId == null) continue;
+      await _matchRepository.updateSeat(game.code, p.playerId!, p.toSeatPatch());
+    }
 
-    emit(game.copyWith(players: players));
+    emit(game.copyWith(players: _mergeLoadedPlayers(game.players)));
   }
 
   Future<void> forfeitAndLeave() async {
@@ -688,22 +713,14 @@ class MatchCubit extends Cubit<GameModel?> {
     if (state?.code == null || state?.players == null) return;
     if (state!.code.length != 4) return;
     final userId = _uid;
-    final players = List<PlayerMatchModel>.from(state!.players)..removeWhere((e) => e.playerId == userId);
     if (userId != null) {
-      await _matchRepository.updateMatch(state!.code, {
-        'players': players.map((e) => e.toMap()).toList(),
-      });
+      await _matchRepository.deleteSeat(state!.code, userId);
     }
   }
 
   bool updateFromSupabase(GameModel? data, {required bool deleted}) {
     if (deleted || data == null) return false;
-    final players = data.players.asMap().entries.map((e) {
-      final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
-      final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
-      return e.value.copyWith(loadedPlayer: sameId ? loaded : e.value.loadedPlayer);
-    }).toList();
-    emit(data.copyWith(players: players));
+    emit(data.copyWith(players: _mergeLoadedPlayers(data.players)));
     if (needsAutoDraw) {
       unawaited(ensureAutoDraw());
     }
@@ -733,10 +750,36 @@ class MatchCubit extends Cubit<GameModel?> {
     return userIndex;
   }
 
+  int? _indexForSeat(List<PlayerMatchModel> players, int seat) {
+    final i = players.indexWhere((p) => p.seat == seat);
+    return i < 0 ? null : i;
+  }
+
+  PlayerMatchModel? _playerAtSeat(GameModel game, int? seat) {
+    if (seat == null) return null;
+    for (final p in game.players) {
+      if (p.seat == seat) return p;
+    }
+    return null;
+  }
+
   PlayerMatchModel? _me() {
     final idx = getUserIndex();
     if (idx == null || state == null) return null;
     return state!.players[idx];
+  }
+
+  List<PlayerMatchModel> _mergeLoadedPlayers(List<PlayerMatchModel> incoming) {
+    return incoming.map((p) {
+      PlayerMatchModel? prev;
+      for (final existing in state?.players ?? const <PlayerMatchModel>[]) {
+        if (existing.playerId == p.playerId) {
+          prev = existing;
+          break;
+        }
+      }
+      return p.copyWith(loadedPlayer: prev?.loadedPlayer ?? p.loadedPlayer);
+    }).toList();
   }
 
   Future<List<PlayerMatchModel>> _loadPlayers(List<PlayerMatchModel> players) async {

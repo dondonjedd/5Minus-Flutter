@@ -55,11 +55,9 @@ class GameModel {
   factory GameModel.fromMap(Map<String, dynamic> data) => GameModel(
         hostId: (data['host_id'] as String?) ?? '',
         code: (data['game_code'] as String?) ?? '',
-        players: (data['players'] as List<dynamic>?)?.map(
-              (e) {
-                return PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map));
-              },
-            ).toList() ??
+        players: (data['players'] as List<dynamic>?)
+                ?.map((e) => PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map)))
+                .toList() ??
             [],
         gameType: (data['game_type'] as num?)?.toInt(),
         isActive: (data['is_active'] as bool?) ?? false,
@@ -84,7 +82,6 @@ class GameModel {
   Map<String, dynamic> toMap() => {
         'host_id': hostId,
         'game_code': code,
-        'players': players.map((e) => e.toMap()).toList(),
         'game_type': gameType,
         'is_active': isActive,
         'has_started': hasStarted,

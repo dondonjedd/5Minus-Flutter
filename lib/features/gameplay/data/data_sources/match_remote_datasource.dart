@@ -21,4 +21,15 @@ class MatchRemoteDatasource {
   Future<void> deleteMatch(String gameCode) => SupabaseService.deleteMatch(gameCode);
 
   Stream<Map<String, dynamic>?> watchMatch(String gameCode) => SupabaseService.watchMatch(gameCode);
+
+  Future<List<Map<String, dynamic>>> fetchSeats(String gameCode) => SupabaseService.fetchSeats(gameCode);
+
+  Future<void> insertSeat(Map<String, dynamic> row) => SupabaseService.insertSeat(row);
+
+  Future<void> updateSeat(String gameCode, String userId, Map<String, dynamic> patch) =>
+      SupabaseService.updateSeat(gameCode, userId, patch);
+
+  Future<void> deleteSeat(String gameCode, String userId) => SupabaseService.deleteSeat(gameCode, userId);
+
+  Stream<Map<String, dynamic>?> watchSeats(String gameCode) => SupabaseService.watchSeats(gameCode);
 }

@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/core/errors/exceptions.dart';
 import 'package:five_minus/features/auth_game_services/data/repositories/user_repository.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/active_game_controller.dart';
 import 'package:five_minus/features/gameplay/data/repositories/match_repository.dart';
@@ -89,7 +90,7 @@ class LobbyController {
       final game = GameModel(
         hostId: hostId,
         code: gameCode,
-        players: [PlayerMatchModel(playerId: hostId, isReady: true)],
+        players: [PlayerMatchModel(playerId: hostId, isReady: true, seat: 0)],
         gameType: 0,
         isActive: false,
         hasStarted: false,
@@ -145,29 +146,50 @@ class LobbyController {
 
   //*******************CLIENT********************
 
+  static int lowestFreeSeat(List<PlayerMatchModel> players) {
+    final taken = players.map((p) => p.seat).toSet();
+    var seat = 0;
+    while (taken.contains(seat)) {
+      seat++;
+    }
+    return seat;
+  }
+
   /// Returns a join error message, or null on success.
   Future<String?> joinGameOrError(String gameCode) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return 'Not signed in';
 
-    final existing = await _matchRepository.fetchMatch(gameCode);
-    if (existing == null) return 'Game does not exist';
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final existing = await _matchRepository.fetchMatch(gameCode);
+      if (existing == null) return 'Game does not exist';
 
-    if (existing.hasStarted) return 'Game already started';
+      if (existing.hasStarted) return 'Game already started';
 
-    final alreadyJoined = existing.players.any((p) => p.playerId == userId);
-    if (!alreadyJoined) {
+      if (existing.players.any((p) => p.playerId == userId)) return null;
+
       if (existing.players.length >= maxPlayers) {
         return 'Game is full (max $maxPlayers players)';
       }
-      final players = [
-        ...existing.players.map((e) => e.toMap()),
-        PlayerMatchModel(playerId: userId).toMap(),
-      ];
-      await _matchRepository.updateMatch(gameCode, {'players': players});
+
+      final seat = lowestFreeSeat(existing.players);
+      try {
+        await _matchRepository.insertSeat(
+          PlayerMatchModel(playerId: userId, seat: seat),
+          gameCode: gameCode,
+        );
+        return null;
+      } on ServerException catch (e) {
+        final alreadySeated = e.statusCode == '23505' && e.message.contains('pkey');
+        if (alreadySeated) return null;
+        final seatTaken = e.statusCode == '23505';
+        if (seatTaken && attempt == 0) continue;
+        if (seatTaken) return 'Game is full (max $maxPlayers players)';
+        rethrow;
+      }
     }
 
-    return null;
+    return 'Game is full (max $maxPlayers players)';
   }
 
   //JOIN GAME
@@ -186,15 +208,8 @@ class LobbyController {
     if (gameCode == null || playerModelList == null) return;
     if (gameCode.length != 4) return;
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    playerModelList.removeWhere(
-      (element) {
-        return element.playerId == userId;
-      },
-    );
     if (userId != null) {
-      await _matchRepository.updateMatch(gameCode, {
-        'players': playerModelList.map((e) => e.toMap()).toList(),
-      });
+      await _matchRepository.deleteSeat(gameCode, userId);
     }
   }
 
@@ -204,19 +219,12 @@ class LobbyController {
     if (gameCode.length != 4) return;
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    playerModelList = playerModelList.map(
-      (e) {
-        if (e.playerId == userId) {
-          e = e.copyWith(isReady: !(e.isReady ?? true));
-        }
-        return e;
-      },
-    ).toList();
-    if (userId != null) {
-      await _matchRepository.updateMatch(gameCode, {
-        'players': playerModelList.map((e) => e.toMap()).toList(),
-      });
-    }
+    if (userId == null) return;
+    final me = playerModelList.firstWhereOrNull((e) => e.playerId == userId);
+    if (me == null) return;
+    await _matchRepository.updateSeat(gameCode, userId, {
+      'is_ready': !(me.isReady ?? true),
+    });
   }
 
   bool isPlayerReady({required List<PlayerMatchModel>? playerModelList}) {
@@ -252,9 +260,9 @@ class LobbyController {
   }) async {
     final List<PlayerMatchModel> tmpList = [];
     for (final element in incoming) {
-      final matchingElement = previous?.firstWhereOrNull((el2) => el2 == element);
+      final matchingElement = previous?.firstWhereOrNull((el2) => el2.playerId == element.playerId);
       if (matchingElement != null) {
-        tmpList.add(matchingElement);
+        tmpList.add(element.copyWith(loadedPlayer: matchingElement.loadedPlayer));
       } else if (element.playerId != null) {
         final user = await _userRepository.fetchFirebaseUser(element.playerId!);
         tmpList.add(element.copyWith(loadedPlayer: user));

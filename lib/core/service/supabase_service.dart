@@ -184,6 +184,114 @@ class SupabaseService {
     return controller.stream;
   }
 
+  static Future<List<Map<String, dynamic>>> fetchSeats(String gameCode) async {
+    try {
+      final rows = await _client.from('match_players').select().eq('game_code', gameCode).order('seat');
+      return rows.map((e) => Map<String, dynamic>.from(e)).toList();
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Seat fetch error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> insertSeat(Map<String, dynamic> row) async {
+    try {
+      await _client.from('match_players').insert(row);
+    } on PostgrestException catch (e) {
+      throw ServerException(
+        title: 'Seat insert error',
+        message: e.message,
+        statusCode: e.code ?? '999',
+      );
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Seat insert error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> updateSeat(String gameCode, String userId, Map<String, dynamic> patch) async {
+    try {
+      await _client.from('match_players').update(patch).eq('game_code', gameCode).eq('user_id', userId);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Seat update error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> deleteSeat(String gameCode, String userId) async {
+    try {
+      await _client.from('match_players').delete().eq('game_code', gameCode).eq('user_id', userId);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Seat delete error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  /// Emits on any Seat change for this Match. Payload is the new row, or `null` on delete.
+  static Stream<Map<String, dynamic>?> watchSeats(String gameCode) {
+    late final StreamController<Map<String, dynamic>?> controller;
+    RealtimeChannel? channel;
+
+    controller = StreamController<Map<String, dynamic>?>(
+      onListen: () {
+        try {
+          channel = _client.channel('match_players:$gameCode').onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'match_players',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'game_code',
+              value: gameCode,
+            ),
+            callback: (payload) {
+              if (controller.isClosed) return;
+              if (payload.eventType == PostgresChangeEvent.delete) {
+                controller.add(null);
+                return;
+              }
+              controller.add(Map<String, dynamic>.from(payload.newRecord));
+            },
+          ).subscribe();
+        } catch (e) {
+          controller.addError(
+            ServerException(
+              title: 'Seat watch error',
+              message: e.toString(),
+              statusCode: '999',
+            ),
+          );
+        }
+      },
+      onCancel: () async {
+        await channel?.unsubscribe();
+        channel = null;
+      },
+    );
+
+    return controller.stream;
+  }
+
   static Future<Map<String, dynamic>?> fetchUser(String id) async {
     try {
       final data = await _client.from('users').select().eq('id', id).maybeSingle();
