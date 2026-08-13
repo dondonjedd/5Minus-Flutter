@@ -78,12 +78,20 @@ class MatchRepository {
     late final StreamController<GameModel?> controller;
     StreamSubscription<Map<String, dynamic>?>? matchSub;
     StreamSubscription<Map<String, dynamic>?>? seatSub;
+    Timer? poll;
     var fetching = false;
     var pending = false;
+    var seen = false;
+
+    void emitGone() {
+      poll?.cancel();
+      poll = null;
+      if (!controller.isClosed) controller.add(null);
+    }
 
     Future<void> refresh({required bool deleted}) async {
       if (deleted) {
-        if (!controller.isClosed) controller.add(null);
+        emitGone();
         return;
       }
       if (fetching) {
@@ -95,10 +103,18 @@ class MatchRepository {
         do {
           pending = false;
           final game = await fetchMatch(gameCode);
+          if (game == null) {
+            // After we have loaded this Match once, a missing row means the
+            // host deleted it (or it ended). Do not kick on the first miss.
+            if (seen) emitGone();
+            continue;
+          }
+          seen = true;
           if (!controller.isClosed) controller.add(game);
         } while (pending);
-      } catch (e, st) {
-        if (!controller.isClosed) controller.addError(e, st);
+      } catch (_) {
+        // Swallow so a single failed poll does not cancel the stream
+        // (Dart cancels subscriptions on unhandled stream errors).
       } finally {
         fetching = false;
       }
@@ -108,14 +124,20 @@ class MatchRepository {
       onListen: () {
         matchSub = _datasource.watchMatch(gameCode).listen(
           (row) => refresh(deleted: row == null),
-          onError: controller.addError,
+          onError: (_) {},
         );
         seatSub = _datasource.watchSeats(gameCode).listen(
           (_) => refresh(deleted: false),
-          onError: controller.addError,
+          onError: (_) {},
         );
+        unawaited(refresh(deleted: false));
+        poll = Timer.periodic(const Duration(seconds: 2), (_) {
+          unawaited(refresh(deleted: false));
+        });
       },
       onCancel: () async {
+        poll?.cancel();
+        poll = null;
         await matchSub?.cancel();
         await seatSub?.cancel();
       },

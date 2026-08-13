@@ -1,0 +1,9 @@
+# Identity seam: Firebase Third-party Auth.
+# Enable on the hosted project (this file does not flip remote Auth settings by itself):
+#   https://supabase.com/dashboard/project/gfbyydeemhxvrhthsvll/auth/third-party
+#   Add Firebase, project ID minus-9c259
+# Postgres Changes already uses table RLS once the client sends the Firebase JWT.
+
+[auth.third_party.firebase]
+enabled = true
+project_id = "minus-9c259"

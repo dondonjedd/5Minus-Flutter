@@ -50,22 +50,30 @@ class DashboardScreen extends StatelessWidget {
                 },
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
-              MenuButton(
+              const MenuButton(
                 title: 'Leaderboard',
                 assetPath: AssetPath.leaderboard,
                 onTap: null,
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
-              MenuButton(
+              const MenuButton(
                 title: 'Tutorial',
                 assetPath: AssetPath.tutorial,
                 onTap: null,
               ),
               const Padding(padding: EdgeInsets.only(bottom: 12)),
-              MenuButton(
+              const MenuButton(
                 title: 'Settings',
                 assetPath: AssetPath.settings,
                 onTap: null,
+              ),
+              const Padding(padding: EdgeInsets.only(bottom: 12)),
+              MenuButton(
+                title: 'Logout',
+                icon: Icons.logout,
+                onTap: () {
+                  controller.signOut(context);
+                },
               ),
               SizedBox(
                 height: MediaQuery.sizeOf(context).height * 0.15,
@@ -80,9 +88,10 @@ class DashboardScreen extends StatelessWidget {
 
 class MenuButton extends StatelessWidget {
   final String? assetPath;
+  final IconData? icon;
   final String title;
   final Function()? onTap;
-  const MenuButton({super.key, this.assetPath, required this.title, this.onTap});
+  const MenuButton({super.key, this.assetPath, this.icon, required this.title, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -117,10 +126,17 @@ class MenuButton extends StatelessWidget {
                     ),
                   ),
                 )
-              : const Expanded(
-                  child: SizedBox(
-                  width: 24,
-                )),
+              : icon != null
+                  ? Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Icon(icon, size: 24),
+                      ),
+                    )
+                  : const Expanded(
+                      child: SizedBox(
+                      width: 24,
+                    )),
           Expanded(flex: 4, child: Text(title)),
         ],
       ),

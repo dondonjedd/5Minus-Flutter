@@ -1,5 +1,7 @@
+import 'package:five_minus/core/utility/dialog_utility.dart';
 import 'package:five_minus/core/utility/loading_overlay_utility.dart';
 import 'package:five_minus/features/auth_game_services/data/aug_data_repository.dart';
+import 'package:five_minus/features/auth_game_services/presentation/authenticating_controller.dart';
 import 'package:five_minus/features/gameplay/model/lobby_params.dart';
 import 'package:five_minus/features/gameplay/lobby/presentation/lobby_controller.dart';
 import 'package:five_minus/features/join_game/presentation/join_game_controller.dart';
@@ -41,6 +43,24 @@ class DashboardController {
 
   navigateSettings(BuildContext context) {
     context.goNamed(SettingsController.routeName);
+  }
+
+  Future<void> signOut(BuildContext context) async {
+    LoadingOverlay().show(context);
+    AuthenticatingController.skipAutoSignIn = true;
+    final result = await _augDataRepository.signOut();
+    LoadingOverlay().hide();
+    await result.fold(
+      (failure) async {
+        AuthenticatingController.skipAutoSignIn = false;
+        if (!context.mounted) return;
+        DialogUtility().showError(context, title: failure.title, message: failure.errorMessage);
+      },
+      (_) async {
+        if (!context.mounted) return;
+        context.goNamed(AuthenticatingController.routeName);
+      },
+    );
   }
 
   PgsUserModel? getUserDetails() {

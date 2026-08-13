@@ -7,6 +7,10 @@ import 'authenticating_screen.dart';
 
 class AuthenticatingController {
   static const String routeName = '/AuthenticatingController';
+
+  /// Set before navigating here from Logout so Play Games does not immediately sign back in.
+  static bool skipAutoSignIn = false;
+
   static Widget screen() {
     return AuthenticatingScreen(controller: AuthenticatingController._());
   }

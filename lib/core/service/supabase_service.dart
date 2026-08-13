@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/core/errors/exceptions.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -25,7 +26,12 @@ class SupabaseService {
     await Supabase.initialize(
       url: url,
       publishableKey: anonKey,
-      // Firebase Auth is used for sign-in; skip Supabase deep-link auth (app_links).
+      // Firebase JWT is the identity seam; skip Supabase Auth session recovery.
+      accessToken: () async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return null;
+        return user.getIdToken();
+      },
       authOptions: const FlutterAuthClientOptions(
         detectSessionInUri: false,
       ),
@@ -138,6 +144,11 @@ class SupabaseService {
     }
   }
 
+  static Future<void> _syncRealtimeAuth() async {
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    await _client.realtime.setAuth(token);
+  }
+
   /// Emits the latest match row map, or `null` when the row is deleted.
   /// Cancel the subscription to unsubscribe the underlying Realtime channel.
   static Stream<Map<String, dynamic>?> watchMatch(String gameCode) {
@@ -146,34 +157,39 @@ class SupabaseService {
 
     controller = StreamController<Map<String, dynamic>?>(
       onListen: () {
-        try {
-          channel = _client.channel('match:$gameCode').onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'matches',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'game_code',
-              value: gameCode,
-            ),
-            callback: (payload) {
-              if (controller.isClosed) return;
-              if (payload.eventType == PostgresChangeEvent.delete) {
-                controller.add(null);
-                return;
-              }
-              controller.add(Map<String, dynamic>.from(payload.newRecord));
-            },
-          ).subscribe();
-        } catch (e) {
-          controller.addError(
-            ServerException(
-              title: 'Match watch error',
-              message: e.toString(),
-              statusCode: '999',
-            ),
-          );
-        }
+        () async {
+          try {
+            await _syncRealtimeAuth();
+            if (controller.isClosed) return;
+            channel = _client.channel('match:$gameCode').onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'matches',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'game_code',
+                value: gameCode,
+              ),
+              callback: (payload) {
+                if (controller.isClosed) return;
+                if (payload.eventType == PostgresChangeEvent.delete) {
+                  controller.add(null);
+                  return;
+                }
+                controller.add(Map<String, dynamic>.from(payload.newRecord));
+              },
+            ).subscribe();
+          } catch (e) {
+            if (controller.isClosed) return;
+            controller.addError(
+              ServerException(
+                title: 'Match watch error',
+                message: e.toString(),
+                statusCode: '999',
+              ),
+            );
+          }
+        }();
       },
       onCancel: () async {
         await channel?.unsubscribe();
@@ -254,34 +270,39 @@ class SupabaseService {
 
     controller = StreamController<Map<String, dynamic>?>(
       onListen: () {
-        try {
-          channel = _client.channel('match_players:$gameCode').onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'match_players',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'game_code',
-              value: gameCode,
-            ),
-            callback: (payload) {
-              if (controller.isClosed) return;
-              if (payload.eventType == PostgresChangeEvent.delete) {
-                controller.add(null);
-                return;
-              }
-              controller.add(Map<String, dynamic>.from(payload.newRecord));
-            },
-          ).subscribe();
-        } catch (e) {
-          controller.addError(
-            ServerException(
-              title: 'Seat watch error',
-              message: e.toString(),
-              statusCode: '999',
-            ),
-          );
-        }
+        () async {
+          try {
+            await _syncRealtimeAuth();
+            if (controller.isClosed) return;
+            channel = _client.channel('match_players:$gameCode').onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'match_players',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'game_code',
+                value: gameCode,
+              ),
+              callback: (payload) {
+                if (controller.isClosed) return;
+                if (payload.eventType == PostgresChangeEvent.delete) {
+                  controller.add(null);
+                  return;
+                }
+                controller.add(Map<String, dynamic>.from(payload.newRecord));
+              },
+            ).subscribe();
+          } catch (e) {
+            if (controller.isClosed) return;
+            controller.addError(
+              ServerException(
+                title: 'Seat watch error',
+                message: e.toString(),
+                statusCode: '999',
+              ),
+            );
+          }
+        }();
       },
       onCancel: () async {
         await channel?.unsubscribe();

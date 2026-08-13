@@ -17,6 +17,7 @@ class _AuthenticatingScreenState extends State<AuthenticatingScreen> {
   bool isSuccess = false;
 
   signIn() async {
+    AuthenticatingController.skipAutoSignIn = false;
     setState(() {
       isAuthenticating = true;
     });
@@ -33,6 +34,13 @@ class _AuthenticatingScreenState extends State<AuthenticatingScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback(
       (timeStamp) async {
+        if (AuthenticatingController.skipAutoSignIn) {
+          setState(() {
+            isAuthenticating = false;
+            isSuccess = false;
+          });
+          return;
+        }
         await signIn();
       },
     );
@@ -61,7 +69,9 @@ class _AuthenticatingScreenState extends State<AuthenticatingScreen> {
                     ? 'Authenticating...'
                     : isSuccess
                         ? 'Login Successfull'
-                        : 'Login Failed',
+                        : AuthenticatingController.skipAutoSignIn
+                            ? 'Signed out'
+                            : 'Login Failed',
                 textAlign: TextAlign.center,
               ),
             ),

@@ -22,6 +22,16 @@ class AugNetworkDatasource {
     }
   }
 
+  Future<void> signOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } on FirebaseAuthException catch (e) {
+      throw ServerException(title: e.code, message: e.message ?? 'Logout error', statusCode: '999', type: '2');
+    } catch (e) {
+      throw ServerException(title: 'Logout error', message: e.toString(), statusCode: '999');
+    }
+  }
+
   Future<FirebaseUserModel?> signInFirebaseWithPlayGamesServices() async {
     try {
       final authCode = await GamesServices.getAuthCode(ConfigurationData.clientId);

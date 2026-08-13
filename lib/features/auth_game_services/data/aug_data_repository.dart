@@ -37,6 +37,18 @@ class AugDataRepository {
     }
   }
 
+  ResultVoid signOut() async {
+    try {
+      await _networkDatasource.signOut();
+      await _localDatasource.setUserInfo('');
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(type: e.type, title: e.title, message: e.message, statusCode: e.statusCode));
+    } on CacheException catch (e) {
+      return Left(CacheFailure(title: e.title, message: e.message, statusCode: e.statusCode));
+    }
+  }
+
   ResultVoid createFirebaseUser(FirebaseUserModel model) async {
     try {
       await _networkDatasource.createFirebaseUser(model);

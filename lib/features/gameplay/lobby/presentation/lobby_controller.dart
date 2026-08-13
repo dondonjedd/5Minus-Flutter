@@ -264,8 +264,12 @@ class LobbyController {
       if (matchingElement != null) {
         tmpList.add(element.copyWith(loadedPlayer: matchingElement.loadedPlayer));
       } else if (element.playerId != null) {
-        final user = await _userRepository.fetchFirebaseUser(element.playerId!);
-        tmpList.add(element.copyWith(loadedPlayer: user));
+        try {
+          final user = await _userRepository.fetchFirebaseUser(element.playerId!);
+          tmpList.add(element.copyWith(loadedPlayer: user));
+        } catch (_) {
+          tmpList.add(element);
+        }
       } else {
         tmpList.add(element);
       }

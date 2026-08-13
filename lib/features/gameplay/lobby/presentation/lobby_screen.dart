@@ -67,11 +67,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   void _updateLocalFromSupabase(GameModel? data, {required bool deleted}) async {
-    if (deleted || data == null) {
+    if (deleted) {
       if (!context.mounted) return;
       widget.controller.navigateDashboard(context);
       return;
     }
+    if (data == null) return;
 
     final tmpList = await widget.controller.mergePlayersWithProfiles(
       data.players,
