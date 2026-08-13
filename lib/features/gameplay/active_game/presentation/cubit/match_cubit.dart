@@ -267,12 +267,7 @@ class MatchCubit extends Cubit<GameModel?> {
   }
 
   Future<void> leaveGame() async {
-    if (state?.code == null || state?.players == null) return;
-    if (state!.code.length != 4) return;
-    final userId = _uid;
-    if (userId != null) {
-      await _matchRepository.deleteSeat(state!.code, userId);
-    }
+    await forfeitAndLeave();
   }
 
   bool updateFromSupabase(GameModel? data, {required bool deleted}) {

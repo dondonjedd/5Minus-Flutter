@@ -20,6 +20,10 @@ One `match_players` row: a User in a Match, including hand, ready, presence (`la
 
 In-memory `PlayerMatchModel` assembled from a Seat, plus `loadedPlayer` (never persisted).
 
+## Seat membership
+
+Table writes on Seat and Match that are not Match play: lobby insert (own User), `is_ready` (own Seat, lobby only), leave (own Seat, lobby only), host kick (host deletes any Seat in lobby). Host leave in lobby cancels the Match. `last_seen` is writable while seated. Active exit is Match play `forfeit`.
+
 ## Match play
 
 The Postgres module whose interface is named public moves (`start_match`, `claim_draw`, `discard_drawn`, `replace_hand`, `eliminate_card`, `swap_hands`, `clear_pending_power`, `declare_challenge`, `end_turn`, `forfeit`, `win_by_disconnect`). Each move mutates Match piles and Seat hands in one transaction and returns `{ match, seats }`. Membership RLS is not this module. Flutter is an adapter.
