@@ -28,8 +28,7 @@ class JoinGameController {
 
   //VERIFY IF GAME EXISTS
   Future<bool> isGameExist(String gameCode) async {
-    final res = await SupabaseService.client.from('matches').select('game_code').eq('game_code', gameCode).maybeSingle();
-    return res != null;
+    return SupabaseService.matchExists(gameCode);
   }
 
   JoinGameController._();

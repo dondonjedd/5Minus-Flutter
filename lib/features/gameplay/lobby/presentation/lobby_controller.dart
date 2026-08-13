@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,7 +12,6 @@ import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 import 'package:five_minus/features/dashboard/presentation/dashboard_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'lobby_screen.dart';
 
@@ -33,8 +33,6 @@ class LobbyController {
   /// Pre-lobby join validation (full / started / missing).
   static Future<String?> joinGate(String gameCode) => LobbyController._().joinGameOrError(gameCode);
 
-  SupabaseClient get _client => SupabaseService.client;
-
   bool isHost({required String? hostId, String? uid}) {
     if (hostId == null) return false;
     if (hostId.isEmpty) return false;
@@ -50,7 +48,7 @@ class LobbyController {
     if ((players?.length ?? 0) != maxPlayers) return;
     if (players!.any((p) => !(p.isReady ?? false))) return;
 
-    await _client.from('matches').update({'has_started': true}).eq('game_code', gameCode);
+    await SupabaseService.updateMatch(gameCode, {'has_started': true});
 
     if (!context.mounted) return;
     navigateActiveGame(context, gameCode: gameCode);
@@ -62,7 +60,7 @@ class LobbyController {
   deleteGame({required String? gameCode}) async {
     if (gameCode == null) return;
     if (gameCode.isEmpty) return;
-    await _client.from('matches').delete().eq('game_code', gameCode);
+    await SupabaseService.deleteMatch(gameCode);
   }
 
   //CREATE GAME
@@ -88,10 +86,10 @@ class LobbyController {
         isActive: false,
         hasStarted: false,
       );
-      await _client.from('matches').insert(game.toMap());
+      await SupabaseService.insertMatch(game.toMap());
     }
 
-    final data = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    final data = await SupabaseService.fetchMatch(gameCode);
     GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(data ?? {}));
     return gameModel.copyWith(players: await _loadPlayers(gameModel.players));
   }
@@ -104,8 +102,7 @@ class LobbyController {
 
   //VERIFY IF GAME CODE IS AVAILABLE
   Future<bool> isGameCodeAvailable(String gameCode) async {
-    final res = await _client.from('matches').select('game_code').eq('game_code', gameCode).maybeSingle();
-    return res == null;
+    return !(await SupabaseService.matchExists(gameCode));
   }
 
   //TOGGLE GAME TYPE
@@ -121,35 +118,20 @@ class LobbyController {
   Future<void> toggleGameTypeFstore({required String? gameCode, required int gameType}) async {
     if (gameCode == null) return;
 
-    await _client.from('matches').update({'game_type': gameType}).eq('game_code', gameCode);
+    await SupabaseService.updateMatch(gameCode, {'game_type': gameType});
     return;
   }
 
-  RealtimeChannel? listenToChanges(GameModel? gameModel, void Function(Map<String, dynamic>? data, {required bool deleted})? onData) {
+  StreamSubscription<Map<String, dynamic>?>? listenToChanges(
+    GameModel? gameModel,
+    void Function(Map<String, dynamic>? data, {required bool deleted})? onData,
+  ) {
     final code = gameModel?.code;
     if (code == null || onData == null) return null;
 
-    return _client
-        .channel('match:$code')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'matches',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'game_code',
-            value: code,
-          ),
-          callback: (payload) {
-            if (payload.eventType == PostgresChangeEvent.delete) {
-              onData(null, deleted: true);
-              return;
-            }
-            final record = payload.newRecord;
-            onData(Map<String, dynamic>.from(record), deleted: false);
-          },
-        )
-        .subscribe();
+    return SupabaseService.watchMatch(code).listen((data) {
+      onData(data, deleted: data == null);
+    });
   }
 
   //*******************HOST********************
@@ -161,7 +143,7 @@ class LobbyController {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return 'Not signed in';
 
-    final existing = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    final existing = await SupabaseService.fetchMatch(gameCode);
     if (existing == null) return 'Game does not exist';
 
     final gameModel = GameModel.fromMap(Map<String, dynamic>.from(existing));
@@ -176,7 +158,7 @@ class LobbyController {
         ...gameModel.players.map((e) => e.toMap()),
         PlayerMatchModel(playerId: userId).toMap(),
       ];
-      await _client.from('matches').update({'players': players}).eq('game_code', gameCode);
+      await SupabaseService.updateMatch(gameCode, {'players': players});
     }
 
     return null;
@@ -189,7 +171,7 @@ class LobbyController {
       throw StateError(error);
     }
 
-    final data = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    final data = await SupabaseService.fetchMatch(gameCode);
     GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(data ?? {}));
     return gameModel.copyWith(players: await _loadPlayers(gameModel.players));
   }
@@ -205,9 +187,9 @@ class LobbyController {
       },
     );
     if (userId != null) {
-      await _client.from('matches').update({
+      await SupabaseService.updateMatch(gameCode, {
         'players': playerModelList.map((e) => e.toMap()).toList(),
-      }).eq('game_code', gameCode);
+      });
     }
   }
 
@@ -226,9 +208,9 @@ class LobbyController {
       },
     ).toList();
     if (userId != null) {
-      await _client.from('matches').update({
+      await SupabaseService.updateMatch(gameCode, {
         'players': playerModelList.map((e) => e.toMap()).toList(),
-      }).eq('game_code', gameCode);
+      });
     }
   }
 
@@ -252,10 +234,10 @@ class LobbyController {
         loaded.add(e);
         continue;
       }
-      final data = await _client.from('users').select().eq('id', e.playerId!).maybeSingle();
+      final data = await SupabaseService.fetchUser(e.playerId!);
       loaded.add(
         e.copyWith(
-          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(data)),
+          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data),
         ),
       );
     }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:collection/collection.dart';
@@ -7,7 +8,6 @@ import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/lobby_params.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
@@ -26,10 +26,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
   bool isLoading = false;
   GameModel? gameModel;
   bool isHost = false;
-  RealtimeChannel? _gameChannel;
+  StreamSubscription<Map<String, dynamic>?>? _gameSubscription;
   @override
   void dispose() {
-    _gameChannel?.unsubscribe();
+    _gameSubscription?.cancel();
     super.dispose();
   }
 
@@ -59,7 +59,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         if (gameModel?.hostId != null) isHost = widget.controller.isHost(hostId: gameModel!.hostId);
 
         //LISTEN CHANGES
-        _gameChannel = widget.controller.listenToChanges(gameModel, _updateLocalFromSupabase);
+        _gameSubscription = widget.controller.listenToChanges(gameModel, _updateLocalFromSupabase);
 
         setState(() {
           isLoading = false;
@@ -87,10 +87,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
       if (matchingElement != null) {
         tmpList.add(matchingElement);
       } else if (element.playerId != null) {
-        final userData = await SupabaseService.client.from('users').select().eq('id', element.playerId!).maybeSingle();
+        final userData = await SupabaseService.fetchUser(element.playerId!);
         tmpList.add(
           element.copyWith(
-            loadedPlayer: userData == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(userData)),
+            loadedPlayer: userData == null ? null : FirebaseUserModel.fromMap(userData),
           ),
         );
       } else {

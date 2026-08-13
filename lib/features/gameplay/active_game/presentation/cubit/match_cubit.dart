@@ -6,7 +6,6 @@ import 'package:five_minus/features/gameplay/enums/enum_card_power.dart';
 import 'package:five_minus/features/gameplay/model/game_constants.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../auth_game_services/model/firebase_user_model.dart';
 import '../../../model/card_model.dart';
@@ -15,8 +14,6 @@ import '../../../model/player_match_model.dart';
 
 class MatchCubit extends Cubit<GameModel?> {
   MatchCubit() : super(null);
-
-  SupabaseClient get _client => SupabaseService.client;
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
@@ -48,7 +45,7 @@ class MatchCubit extends Cubit<GameModel?> {
   Future<void> initalize(String? gameCode) async {
     if (gameCode == null) return;
 
-    final row = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    final row = await SupabaseService.fetchMatch(gameCode);
     GameModel gameModel = GameModel.fromMap(Map<String, dynamic>.from(row ?? {}));
 
     final alreadyDealt = gameModel.drawDeck?.cardDeck?.isNotEmpty == true ||
@@ -75,7 +72,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
       gameModel = gameModel.copyWith(players: dealtPlayers, isActive: true);
 
-      await _client.from('matches').update({
+      await SupabaseService.updateMatch(gameCode, {
         'draw_deck': deck.toMapList(),
         'discard_deck': [],
         'players': gameModel.players.map((e) => e.toMap()).toList(),
@@ -87,10 +84,10 @@ class MatchCubit extends Cubit<GameModel?> {
         'winner': null,
         // Wall-clock turn start so every client can derive the same timer progress.
         'turn_start_time': DateTime.now().toUtc().toIso8601String(),
-      }).eq('game_code', gameModel.code);
+      });
     }
 
-    final refreshed = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+    final refreshed = await SupabaseService.fetchMatch(gameCode);
     final parsed = GameModel.fromMap(Map<String, dynamic>.from(refreshed ?? {}));
     final players = await _loadPlayers(parsed.players);
     emit(parsed.copyWith(players: players));
@@ -106,13 +103,13 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> deleteGame() async {
     if (state?.code.isEmpty ?? true) return;
-    await _client.from('matches').delete().eq('game_code', state!.code);
+    await SupabaseService.deleteMatch(state!.code);
   }
 
   Future<void> setGameToActive() async {
     if (state?.code == null) return;
     emit(state?.copyWith(isActive: true));
-    await _client.from('matches').update({'is_active': true}).eq('game_code', state!.code);
+    await SupabaseService.updateMatch(state!.code, {'is_active': true});
   }
 
   bool isMyTurn() {
@@ -153,29 +150,17 @@ class MatchCubit extends Cubit<GameModel?> {
       if (card == null) return;
 
       final code = game.code;
-      // Use list select (not maybeSingle): 0 rows from a lost race throws PGRST116/406.
-      List<Map<String, dynamic>> rows;
-      try {
-        rows = await _client
-            .from('matches')
-            .update({
-              'drawn_card': card.toMap(),
-              'draw_deck': game.drawDeck?.toMapList(),
-              'discard_deck': game.discardDeck?.toMapList(),
-            })
-            .eq('game_code', code)
-            .isFilter('drawn_card', null)
-            .select();
-      } on PostgrestException catch (e) {
-        // Another client already drew, or no matching row.
-        if (e.code == 'PGRST116') return;
-        rethrow;
-      }
+      // Conditional update: only the client that wins drawn_card IS NULL proceeds.
+      final row = await SupabaseService.updateMatchIfDrawnCardNull(code, {
+        'drawn_card': card.toMap(),
+        'draw_deck': game.drawDeck?.toMapList(),
+        'discard_deck': game.discardDeck?.toMapList(),
+      });
 
-      if (rows.isEmpty) return;
+      if (row == null) return;
       if (state?.code != code) return;
 
-      final parsed = GameModel.fromMap(Map<String, dynamic>.from(rows.first));
+      final parsed = GameModel.fromMap(row);
       final players = parsed.players.asMap().entries.map((e) {
         final loaded = (state?.players.length ?? 0) > e.key ? state!.players[e.key].loadedPlayer : null;
         final sameId = loaded != null && state!.players[e.key].playerId == e.value.playerId;
@@ -522,7 +507,7 @@ class MatchCubit extends Cubit<GameModel?> {
       isActive: false,
       isChallengeComplete: true,
     );
-    await _client.from('matches').update({
+    await SupabaseService.updateMatch(game.code, {
       'winner': {
         ...winner.toMap(),
         'end_reason': reason,
@@ -530,7 +515,7 @@ class MatchCubit extends Cubit<GameModel?> {
       'is_active': false,
       'is_challenge_complete': true,
       'players': game.players.map((e) => e.toMap()).toList(),
-    }).eq('game_code', game.code);
+    });
     emit(game);
   }
 
@@ -543,14 +528,14 @@ class MatchCubit extends Cubit<GameModel?> {
       isActive: false,
       isChallengeComplete: true,
     );
-    await _client.from('matches').update({
+    await SupabaseService.updateMatch(game.code, {
       'winner': {
         ...draw.toMap(),
         'end_reason': reason,
       },
       'is_active': false,
       'is_challenge_complete': true,
-    }).eq('game_code', game.code);
+    });
     emit(game);
   }
 
@@ -593,7 +578,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
     // Read-merge-write so a stale local snapshot cannot clobber turn resets
     // (actionsComplete / eliminationLocked) written by the other client.
-    final row = await _client.from('matches').select('players').eq('game_code', code).maybeSingle();
+    final row = await SupabaseService.fetchMatch(code);
     if (row == null || state?.code != code) return;
 
     final remote = (row['players'] as List<dynamic>? ?? []).map((e) => PlayerMatchModel.fromMap(Map<String, dynamic>.from(e as Map))).toList();
@@ -606,9 +591,9 @@ class MatchCubit extends Cubit<GameModel?> {
     }).toList();
 
     merged[idx] = merged[idx].copyWith(lastSeen: DateTime.now().toUtc().toIso8601String());
-    await _client.from('matches').update({
+    await SupabaseService.updateMatch(code, {
       'players': merged.map((e) => e.toMap()).toList(),
-    }).eq('game_code', code);
+    });
 
     if (state?.code != code) return;
     emit(state!.copyWith(players: merged));
@@ -676,7 +661,7 @@ class MatchCubit extends Cubit<GameModel?> {
       map['winner'] = game.winner!.toMap();
     }
 
-    await _client.from('matches').update(map).eq('game_code', game.code);
+    await SupabaseService.updateMatch(game.code, map);
 
     final players = game.players.asMap().entries.map((e) {
       final loaded = state?.players.length == game.players.length ? state!.players[e.key].loadedPlayer : null;
@@ -699,9 +684,9 @@ class MatchCubit extends Cubit<GameModel?> {
     final userId = _uid;
     final players = List<PlayerMatchModel>.from(state!.players)..removeWhere((e) => e.playerId == userId);
     if (userId != null) {
-      await _client.from('matches').update({
+      await SupabaseService.updateMatch(state!.code, {
         'players': players.map((e) => e.toMap()).toList(),
-      }).eq('game_code', state!.code);
+      });
     }
   }
 
@@ -748,10 +733,10 @@ class MatchCubit extends Cubit<GameModel?> {
         loaded.add(e);
         continue;
       }
-      final data = await _client.from('users').select().eq('id', e.playerId!).maybeSingle();
+      final data = await SupabaseService.fetchUser(e.playerId!);
       loaded.add(
         e.copyWith(
-          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(Map<String, dynamic>.from(data)),
+          loadedPlayer: data == null ? null : FirebaseUserModel.fromMap(data),
         ),
       );
     }

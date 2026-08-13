@@ -37,10 +37,7 @@ class AugNetworkDatasource {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return null;
 
-      await SupabaseService.client.from('users').upsert(
-            model.toMap(id: uid),
-            onConflict: 'id',
-          );
+      await SupabaseService.upsertUser(model.toMap(id: uid));
       return await getUserModel(uid);
     } on FirebaseAuthException catch (e) {
       throw ServerException(title: e.code, message: e.message ?? 'Create user error', statusCode: '999', type: '2');
@@ -51,9 +48,9 @@ class AugNetworkDatasource {
 
   Future<FirebaseUserModel?> getUserModel(String uid) async {
     try {
-      final data = await SupabaseService.client.from('users').select().eq('id', uid).maybeSingle();
+      final data = await SupabaseService.fetchUser(uid);
       if (data == null) return null;
-      return FirebaseUserModel.fromMap(Map<String, dynamic>.from(data));
+      return FirebaseUserModel.fromMap(data);
     } catch (e) {
       throw const ServerException(title: 'Create user error', message: 'Something unexpected happenned', statusCode: '999', type: '2');
     }

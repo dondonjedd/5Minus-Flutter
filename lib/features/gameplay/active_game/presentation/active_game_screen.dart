@@ -12,7 +12,6 @@ import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
@@ -33,7 +32,7 @@ class ActiveGameScreen extends StatefulWidget {
 class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool isLoading = false;
   bool isHost = false;
-  RealtimeChannel? _gameChannel;
+  StreamSubscription<Map<String, dynamic>?>? _gameSubscription;
   int? userIndex;
   Timer? _heartbeat;
   Timer? _reconnectCheck;
@@ -54,7 +53,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
 
   @override
   void dispose() {
-    _gameChannel?.unsubscribe();
+    _gameSubscription?.cancel();
     _heartbeat?.cancel();
     _reconnectCheck?.cancel();
     super.dispose();
@@ -70,7 +69,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       isHost = matchCubit.isHost();
 
       if (!mounted) return;
-      _gameChannel = widget.controller.listenToChanges(context);
+      _gameSubscription = widget.controller.listenToChanges(context);
       userIndex = matchCubit.getUserIndex();
 
       _startOpeningPeek();

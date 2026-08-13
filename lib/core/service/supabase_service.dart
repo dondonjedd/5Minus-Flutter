@@ -1,10 +1,13 @@
+import 'dart:async';
+
+import 'package:five_minus/core/errors/exceptions.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
   SupabaseService._();
 
-  static SupabaseClient get client => Supabase.instance.client;
+  static SupabaseClient get _client => Supabase.instance.client;
 
   static Future<void> initialize() async {
     await dotenv.load(fileName: '.env');
@@ -27,5 +30,187 @@ class SupabaseService {
         detectSessionInUri: false,
       ),
     );
+  }
+
+  static Future<Map<String, dynamic>?> fetchMatch(String gameCode) async {
+    try {
+      final data = await _client.from('matches').select().eq('game_code', gameCode).maybeSingle();
+      if (data == null) return null;
+      return Map<String, dynamic>.from(data);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Match fetch error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<bool> matchExists(String gameCode) async {
+    try {
+      final res = await _client.from('matches').select('game_code').eq('game_code', gameCode).maybeSingle();
+      return res != null;
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Match exists error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> insertMatch(Map<String, dynamic> row) async {
+    try {
+      await _client.from('matches').insert(row);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Match insert error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> updateMatch(String gameCode, Map<String, dynamic> patch) async {
+    try {
+      await _client.from('matches').update(patch).eq('game_code', gameCode);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Match update error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  /// Conditional update when `drawn_card` is null. Returns the updated row, or
+  /// `null` if no row matched (another client already claimed the draw).
+  static Future<Map<String, dynamic>?> updateMatchIfDrawnCardNull(
+    String gameCode,
+    Map<String, dynamic> patch,
+  ) async {
+    try {
+      final rows = await _client
+          .from('matches')
+          .update(patch)
+          .eq('game_code', gameCode)
+          .isFilter('drawn_card', null)
+          .select();
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(rows.first);
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST116') return null;
+      throw ServerException(
+        title: 'Match update error',
+        message: e.message,
+        statusCode: e.code ?? '999',
+      );
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Match update error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> deleteMatch(String gameCode) async {
+    try {
+      await _client.from('matches').delete().eq('game_code', gameCode);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'Match delete error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  /// Emits the latest match row map, or `null` when the row is deleted.
+  /// Cancel the subscription to unsubscribe the underlying Realtime channel.
+  static Stream<Map<String, dynamic>?> watchMatch(String gameCode) {
+    late final StreamController<Map<String, dynamic>?> controller;
+    RealtimeChannel? channel;
+
+    controller = StreamController<Map<String, dynamic>?>(
+      onListen: () {
+        try {
+          channel = _client.channel('match:$gameCode').onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'matches',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'game_code',
+              value: gameCode,
+            ),
+            callback: (payload) {
+              if (controller.isClosed) return;
+              if (payload.eventType == PostgresChangeEvent.delete) {
+                controller.add(null);
+                return;
+              }
+              controller.add(Map<String, dynamic>.from(payload.newRecord));
+            },
+          ).subscribe();
+        } catch (e) {
+          controller.addError(
+            ServerException(
+              title: 'Match watch error',
+              message: e.toString(),
+              statusCode: '999',
+            ),
+          );
+        }
+      },
+      onCancel: () async {
+        await channel?.unsubscribe();
+        channel = null;
+      },
+    );
+
+    return controller.stream;
+  }
+
+  static Future<Map<String, dynamic>?> fetchUser(String id) async {
+    try {
+      final data = await _client.from('users').select().eq('id', id).maybeSingle();
+      if (data == null) return null;
+      return Map<String, dynamic>.from(data);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'User fetch error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
+  }
+
+  static Future<void> upsertUser(Map<String, dynamic> row) async {
+    try {
+      await _client.from('users').upsert(row, onConflict: 'id');
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(
+        title: 'User upsert error',
+        message: e.toString(),
+        statusCode: '999',
+      );
+    }
   }
 }
