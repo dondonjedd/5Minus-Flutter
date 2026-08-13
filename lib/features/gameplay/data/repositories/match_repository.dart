@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:five_minus/features/gameplay/data/data_sources/match_remote_datasource.dart';
+import 'package:five_minus/features/gameplay/model/game_constants.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/features/gameplay/model/player_match_model.dart';
 
@@ -12,7 +13,25 @@ class MatchRepository {
   GameModel _assemble(Map<String, dynamic> row, List<Map<String, dynamic>> seats) {
     final players = seats.map(PlayerMatchModel.fromSeatRow).toList()
       ..sort((a, b) => a.seat.compareTo(b.seat));
-    return GameModel.fromMap(row).copyWith(players: players);
+    var game = GameModel.fromMap(row).copyWith(players: players);
+    final winnerId = game.winner?.playerId;
+    if (winnerId != null && winnerId != GameConstants.drawWinnerId) {
+      for (final p in players) {
+        if (p.playerId == winnerId) {
+          game = game.copyWith(winner: p);
+          break;
+        }
+      }
+    }
+    return game;
+  }
+
+  GameModel assembleBundle(Map<String, dynamic> bundle) {
+    final match = Map<String, dynamic>.from(bundle['match'] as Map);
+    final seats = ((bundle['seats'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    return _assemble(match, seats);
   }
 
   Future<GameModel?> _assembleFromMatchRow(Map<String, dynamic>? row, String gameCode) async {
@@ -48,12 +67,6 @@ class MatchRepository {
     return _datasource.updateMatch(gameCode, matchPatch);
   }
 
-  Future<GameModel?> updateMatchIfDrawnCardNull(String gameCode, Map<String, dynamic> patch) async {
-    final matchPatch = Map<String, dynamic>.from(patch)..remove('players');
-    final row = await _datasource.updateMatchIfDrawnCardNull(gameCode, matchPatch);
-    return _assembleFromMatchRow(row, gameCode);
-  }
-
   Future<void> deleteMatch(String gameCode) => _datasource.deleteMatch(gameCode);
 
   Future<void> insertSeat(PlayerMatchModel player, {required String gameCode}) {
@@ -72,6 +85,63 @@ class MatchRepository {
   }
 
   Future<void> deleteSeat(String gameCode, String userId) => _datasource.deleteSeat(gameCode, userId);
+
+  Future<GameModel> startMatch(String gameCode) async {
+    return assembleBundle(await _datasource.startMatch(gameCode));
+  }
+
+  Future<GameModel> claimDraw(String gameCode) async {
+    return assembleBundle(await _datasource.claimDraw(gameCode));
+  }
+
+  Future<GameModel> discardDrawn(String gameCode) async {
+    return assembleBundle(await _datasource.discardDrawn(gameCode));
+  }
+
+  Future<GameModel> replaceHand(String gameCode, int handIndex) async {
+    return assembleBundle(await _datasource.replaceHand(gameCode, handIndex));
+  }
+
+  Future<({GameModel game, String? notice})> eliminateCard(String gameCode, int handIndex) async {
+    final bundle = await _datasource.eliminateCard(gameCode, handIndex);
+    return (game: assembleBundle(bundle), notice: bundle['notice'] as String?);
+  }
+
+  Future<GameModel> swapHands({
+    required String gameCode,
+    required int seatA,
+    required int indexA,
+    required int seatB,
+    required int indexB,
+  }) async {
+    return assembleBundle(await _datasource.swapHands(
+      gameCode: gameCode,
+      seatA: seatA,
+      indexA: indexA,
+      seatB: seatB,
+      indexB: indexB,
+    ));
+  }
+
+  Future<GameModel> clearPendingPower(String gameCode) async {
+    return assembleBundle(await _datasource.clearPendingPower(gameCode));
+  }
+
+  Future<GameModel> endTurn(String gameCode) async {
+    return assembleBundle(await _datasource.endTurn(gameCode));
+  }
+
+  Future<GameModel> declareChallenge(String gameCode) async {
+    return assembleBundle(await _datasource.declareChallenge(gameCode));
+  }
+
+  Future<GameModel> forfeit(String gameCode) async {
+    return assembleBundle(await _datasource.forfeit(gameCode));
+  }
+
+  Future<GameModel> winByDisconnect(String gameCode) async {
+    return assembleBundle(await _datasource.winByDisconnect(gameCode));
+  }
 
   /// Emits the latest assembled Match, or `null` when the Match row is deleted.
   Stream<GameModel?> watchMatch(String gameCode) {
@@ -104,8 +174,6 @@ class MatchRepository {
           pending = false;
           final game = await fetchMatch(gameCode);
           if (game == null) {
-            // After we have loaded this Match once, a missing row means the
-            // host deleted it (or it ended). Do not kick on the first miss.
             if (seen) emitGone();
             continue;
           }
@@ -113,8 +181,6 @@ class MatchRepository {
           if (!controller.isClosed) controller.add(game);
         } while (pending);
       } catch (_) {
-        // Swallow so a single failed poll does not cancel the stream
-        // (Dart cancels subscriptions on unhandled stream errors).
       } finally {
         fetching = false;
       }

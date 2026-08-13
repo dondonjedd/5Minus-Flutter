@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:five_minus/core/errors/exceptions.dart';
@@ -97,25 +98,26 @@ class SupabaseService {
     }
   }
 
-  /// Conditional update when `drawn_card` is null. Returns the updated row, or
-  /// `null` if no row matched (another client already claimed the draw).
-  static Future<Map<String, dynamic>?> updateMatchIfDrawnCardNull(
-    String gameCode,
-    Map<String, dynamic> patch,
+  static Future<Map<String, dynamic>> rpcMatchPlay(
+    String functionName,
+    Map<String, dynamic> params,
   ) async {
     try {
-      final rows = await _client
-          .from('matches')
-          .update(patch)
-          .eq('game_code', gameCode)
-          .isFilter('drawn_card', null)
-          .select();
-      if (rows.isEmpty) return null;
-      return Map<String, dynamic>.from(rows.first);
+      final data = await _client.rpc(functionName, params: params);
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      if (data is String) {
+        final decoded = jsonDecode(data);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      }
+      throw const ServerException(
+        title: 'Match play error',
+        message: 'Unexpected rpc payload',
+        statusCode: '999',
+      );
     } on PostgrestException catch (e) {
-      if (e.code == 'PGRST116') return null;
       throw ServerException(
-        title: 'Match update error',
+        title: 'Match play error',
         message: e.message,
         statusCode: e.code ?? '999',
       );
@@ -123,7 +125,7 @@ class SupabaseService {
       rethrow;
     } catch (e) {
       throw ServerException(
-        title: 'Match update error',
+        title: 'Match play error',
         message: e.toString(),
         statusCode: '999',
       );

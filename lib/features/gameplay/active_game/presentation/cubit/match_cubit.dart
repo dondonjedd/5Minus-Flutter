@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:five_minus/core/errors/exceptions.dart';
 import 'package:five_minus/features/auth_game_services/data/repositories/user_repository.dart';
 import 'package:five_minus/features/gameplay/data/repositories/match_repository.dart';
 import 'package:five_minus/features/gameplay/enums/enum_card_power.dart';
@@ -9,7 +10,6 @@ import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../model/card_model.dart';
-import '../../../model/deck_model.dart';
 import '../../../model/player_match_model.dart';
 
 class MatchCubit extends Cubit<GameModel?> {
@@ -45,61 +45,15 @@ class MatchCubit extends Cubit<GameModel?> {
     return deck.last;
   }
 
-  bool get isMatchOver => state?.winner != null;
+  bool get isMatchOver => state?.winner != null || state?.status == 'finished';
 
   bool get isDraw => state?.winner?.playerId == GameConstants.drawWinnerId;
 
-  /// Host deals once; joiners only load existing state.
   Future<void> initalize(String? gameCode) async {
     if (gameCode == null) return;
 
     final fetched = await _matchRepository.fetchMatch(gameCode);
-    GameModel gameModel = fetched ?? GameModel.fromMap(<String, dynamic>{});
-
-    final alreadyDealt = gameModel.drawDeck?.cardDeck?.isNotEmpty == true ||
-        (gameModel.players.isNotEmpty && (gameModel.players.first.playerHand?.isNotEmpty ?? false));
-
-    if (isHost(hostId: gameModel.hostId) && !alreadyDealt) {
-      Deck deck = Deck(generateNewRandomDeck: true);
-      final dealtPlayers = gameModel.players.map((player) {
-        final hand = <CardModel>[];
-        while (hand.length < GameConstants.startingHandSize) {
-          final card = deck.getCardFromDeck();
-          if (card == null) break;
-          hand.add(card);
-        }
-        return player.copyWith(
-          playerHand: hand,
-          penaltyCount: 0,
-          eliminationLocked: false,
-          actionsComplete: false,
-          isChallengedDeclard: false,
-          lastSeen: DateTime.now().toUtc().toIso8601String(),
-        );
-      }).toList();
-
-      gameModel = gameModel.copyWith(players: dealtPlayers, isActive: true);
-
-      await _matchRepository.updateMatch(gameCode, {
-        'draw_deck': deck.toMapList(),
-        'discard_deck': [],
-        'turn': 0,
-        'drawn_card': null,
-        'is_active': true,
-        'is_challenge_complete': false,
-        'power_start_time': null,
-        'winner': null,
-        // Wall-clock turn start so every client can derive the same timer progress.
-        'turn_start_time': DateTime.now().toUtc().toIso8601String(),
-      });
-      for (final p in gameModel.players) {
-        if (p.playerId == null) continue;
-        await _matchRepository.updateSeat(gameCode, p.playerId!, p.toSeatPatch());
-      }
-    }
-
-    final refreshed = await _matchRepository.fetchMatch(gameCode);
-    final parsed = refreshed ?? GameModel.fromMap(<String, dynamic>{});
+    final parsed = fetched ?? GameModel.fromMap(<String, dynamic>{});
     final players = await _loadPlayers(parsed.players);
     emit(parsed.copyWith(players: players));
     await ensureAutoDraw();
@@ -117,11 +71,7 @@ class MatchCubit extends Cubit<GameModel?> {
     await _matchRepository.deleteMatch(state!.code);
   }
 
-  Future<void> setGameToActive() async {
-    if (state?.code == null) return;
-    emit(state?.copyWith(isActive: true));
-    await _matchRepository.updateMatch(state!.code, {'is_active': true});
-  }
+  Future<void> setGameToActive() async {}
 
   bool isMyTurn() {
     final me = _me();
@@ -136,7 +86,6 @@ class MatchCubit extends Cubit<GameModel?> {
     return state?.drawnCard == null;
   }
 
-  /// Active seat needs a face-up draw (any client may satisfy this).
   bool get needsAutoDraw {
     final game = state;
     if (game == null || isMatchOver || !game.isActive || hasPendingPower) return false;
@@ -148,30 +97,14 @@ class MatchCubit extends Cubit<GameModel?> {
     return true;
   }
 
-  /// Draw for the active seat if needed. Either client may write; only the first
-  /// conditional update (`drawn_card` IS NULL) wins.
   Future<void> ensureAutoDraw() async {
     if (_autoDrawInFlight || !needsAutoDraw) return;
     _autoDrawInFlight = true;
     try {
       if (!needsAutoDraw) return;
-
-      var game = _cloneState();
-      game = _ensureDrawPile(game);
-      final card = game.drawDeck?.getCardFromDeck() as CardModel?;
-      if (card == null) return;
-
-      final code = game.code;
-      // Conditional update: only the client that wins drawn_card IS NULL proceeds.
-      final parsed = await _matchRepository.updateMatchIfDrawnCardNull(code, {
-        'drawn_card': card.toMap(),
-        'draw_deck': game.drawDeck?.toMapList(),
-        'discard_deck': game.discardDeck?.toMapList(),
-      });
-
-      if (parsed == null) return;
-      if (state?.code != code) return;
-      emit(parsed.copyWith(players: _mergeLoadedPlayers(parsed.players)));
+      await _emitMove(await _matchRepository.claimDraw(state!.code));
+    } on ServerException {
+      // Another client claimed, or it is not this seat's turn.
     } finally {
       _autoDrawInFlight = false;
     }
@@ -189,7 +122,6 @@ class MatchCubit extends Cubit<GameModel?> {
     final me = _me();
     if (me == null) return false;
     if (me.eliminationLocked) return false;
-    // Allowed before discard/replace so the current top discard can still be matched.
     return topDiscard != null;
   }
 
@@ -208,119 +140,26 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> drawCard() async {
     if (!canDraw()) return;
-    var game = _cloneState();
-    game = _ensureDrawPile(game);
-    final card = game.drawDeck!.getCardFromDeck() as CardModel?;
-    if (card == null) return;
-
-    await _persist(
-      game.copyWith(drawnCard: card, drawDeck: game.drawDeck),
-      clearDrawnCard: false,
-      includeDrawnCard: true,
-      seatsToWrite: const [],
-    );
+    try {
+      await _emitMove(await _matchRepository.claimDraw(state!.code));
+    } on ServerException {
+      return;
+    }
   }
 
-  /// Discard the drawn card without replacing a hand card.
   Future<void> discardDrawnCard() async {
     if (!canDiscardOrReplace()) return;
-    GameModel game = _cloneState();
-    final drawn = game.drawnCard;
-    if (drawn == null) return;
-
-    final discard = List<CardModel>.from(game.discardDeck?.cardDeck ?? []);
-    discard.add(drawn);
-    game = game.copyWith(discardDeck: Deck(list: discard), drawnCard: null);
-
-    final idx = getUserIndex()!;
-    await _afterDiscard(game, discarded: drawn, playerIndex: idx);
+    await _emitMove(await _matchRepository.discardDrawn(state!.code));
   }
 
-  /// Replace hand card with drawn card; discarded hand card goes to discard pile.
   Future<void> replaceHandCard(int handIndex) async {
     if (!canDiscardOrReplace()) return;
-    GameModel game = _cloneState();
-    final drawn = game.drawnCard;
-    final idx = getUserIndex()!;
-    final hand = List<CardModel>.from(game.players[idx].playerHand ?? []);
-    if (drawn == null || handIndex < 0 || handIndex >= hand.length) return;
-
-    final removed = hand[handIndex];
-    hand[handIndex] = drawn;
-    final discard = List<CardModel>.from(game.discardDeck?.cardDeck ?? []);
-    discard.add(removed);
-
-    final players = List<PlayerMatchModel>.from(game.players);
-    players[idx] = players[idx].copyWith(playerHand: hand);
-    game = game.copyWith(players: players, discardDeck: Deck(list: discard), drawnCard: null);
-
-    await _afterDiscard(game, discarded: removed, playerIndex: idx);
-  }
-
-  Future<void> _afterDiscard(GameModel game, {required CardModel discarded, required int playerIndex}) async {
-    final power = discarded.cardPower ?? CardPower.none;
-    var players = List<PlayerMatchModel>.from(game.players);
-
-    if (power == CardPower.sabotage) {
-      game = _applyBlackKing(game, sabotagedBy: playerIndex);
-      players = List<PlayerMatchModel>.from(game.players);
-      players[playerIndex] = players[playerIndex].copyWith(actionsComplete: true);
-      game = game.copyWith(players: players, powerStartTime: null);
-      await _persist(
-        game,
-        clearDrawnCard: true,
-        includeDrawnCard: true,
-        clearPowerTime: true,
-        seatsToWrite: [playerIndex, opponentOf(playerIndex)],
-      );
-      await _checkEmptyHandWin(playerIndex);
-      return;
-    }
-
-    if (power == CardPower.look || power == CardPower.swap) {
-      players[playerIndex] = players[playerIndex].copyWith(actionsComplete: true);
-      game = game.copyWith(
-        players: players,
-        powerStartTime: DateTime.now().toUtc(),
-      );
-      await _persist(
-        game,
-        clearDrawnCard: true,
-        includeDrawnCard: true,
-        seatsToWrite: [playerIndex],
-      );
-      return;
-    }
-
-    players[playerIndex] = players[playerIndex].copyWith(actionsComplete: true);
-    game = game.copyWith(players: players, powerStartTime: null);
-    await _persist(
-      game,
-      clearDrawnCard: true,
-      includeDrawnCard: true,
-      clearPowerTime: true,
-      seatsToWrite: [playerIndex],
-    );
-    await _checkEmptyHandWin(playerIndex);
-  }
-
-  GameModel _applyBlackKing(GameModel game, {required int sabotagedBy}) {
-    final opponent = sabotagedBy == 0 ? 1 : 0;
-    if (opponent >= game.players.length) return game;
-    game = _ensureDrawPile(game);
-    final card = game.drawDeck!.getCardFromDeck() as CardModel?;
-    if (card == null) return game;
-    final players = List<PlayerMatchModel>.from(game.players);
-    final hand = List<CardModel>.from(players[opponent].playerHand ?? []);
-    hand.insert(0, card);
-    players[opponent] = players[opponent].copyWith(playerHand: hand);
-    return game.copyWith(players: players, drawDeck: game.drawDeck);
+    await _emitMove(await _matchRepository.replaceHand(state!.code, handIndex));
   }
 
   Future<void> resolveQueenLook({required int handIndex}) async {
     if (!hasPendingPower || _topDiscardPower != CardPower.look || !isMyTurn()) return;
-    // Reveal is local-only (own or opponent); just clear pending power.
-    await _clearPendingPower();
+    await _emitMove(await _matchRepository.clearPendingPower(state!.code));
   }
 
   Future<void> resolveJackSwap({
@@ -330,265 +169,48 @@ class MatchCubit extends Cubit<GameModel?> {
     required int playerIndexB,
   }) async {
     if (!hasPendingPower || _topDiscardPower != CardPower.swap || !isMyTurn()) return;
-    GameModel game = _cloneState();
+    final game = state;
+    if (game == null) return;
     if (playerIndexA >= game.players.length || playerIndexB >= game.players.length) return;
-
-    final players = List<PlayerMatchModel>.from(game.players);
-    final handA = List<CardModel>.from(players[playerIndexA].playerHand ?? []);
-    final handB = List<CardModel>.from(players[playerIndexB].playerHand ?? []);
-    if (handIndexA < 0 || handIndexA >= handA.length) return;
-    if (handIndexB < 0 || handIndexB >= handB.length) return;
-
-    if (playerIndexA == playerIndexB) {
-      final tmp = handA[handIndexA];
-      handA[handIndexA] = handA[handIndexB];
-      handA[handIndexB] = tmp;
-      players[playerIndexA] = players[playerIndexA].copyWith(playerHand: handA);
-    } else {
-      final tmp = handA[handIndexA];
-      handA[handIndexA] = handB[handIndexB];
-      handB[handIndexB] = tmp;
-      players[playerIndexA] = players[playerIndexA].copyWith(playerHand: handA);
-      players[playerIndexB] = players[playerIndexB].copyWith(playerHand: handB);
-    }
-
-    game = game.copyWith(players: players, powerStartTime: null);
-    await _persist(
-      game,
-      clearPowerTime: true,
-      seatsToWrite: {playerIndexA, playerIndexB}.toList(),
-    );
+    await _emitMove(await _matchRepository.swapHands(
+      gameCode: game.code,
+      seatA: game.players[playerIndexA].seat,
+      indexA: handIndexA,
+      seatB: game.players[playerIndexB].seat,
+      indexB: handIndexB,
+    ));
   }
 
-  Future<void> _clearPendingPower() async {
-    if (state?.code == null) return;
-    final game = state!.copyWith(powerStartTime: null);
-    await _persist(game, clearPowerTime: true, seatsToWrite: const []);
-  }
-
-  /// Attempt to eliminate a face-down hand card against the top discard rank.
   Future<String?> eliminateCard(int handIndex) async {
     if (!canEliminate()) return 'Cannot eliminate now';
-    final top = topDiscard;
-    if (top == null) return 'No discard card';
-
-    GameModel game = _cloneState();
-    final idx = getUserIndex()!;
-    final hand = List<CardModel>.from(game.players[idx].playerHand ?? []);
-    if (handIndex < 0 || handIndex >= hand.length) return 'Invalid card';
-
-    final card = hand[handIndex];
-    if (card.rank != top.rank) {
-      game = _applyPenalty(game, playerIndex: idx, lockElimination: true);
-      await _persist(game);
-      if (_isDisqualified(game.players[idx])) {
-        await _endAsWinner(opponentOf(idx), EndReason.penalties);
-      }
-      return 'Wrong rank — elimination locked until your next turn';
-    }
-
-    hand.removeAt(handIndex);
-    final players = List<PlayerMatchModel>.from(game.players);
-    players[idx] = players[idx].copyWith(playerHand: hand);
-    game = game.copyWith(players: players);
-    await _persist(game);
-
-    if (hand.isEmpty) {
-      await _endAsWinner(idx, EndReason.emptyHand);
-    }
-    return null;
+    if (topDiscard == null) return 'No discard card';
+    final result = await _matchRepository.eliminateCard(state!.code, handIndex);
+    await _emitMove(result.game);
+    return result.notice;
   }
 
   Future<void> declareChallenge() async {
     if (!canChallenge()) return;
-    GameModel game = _cloneState();
-    final idx = getUserIndex()!;
-    final players = List<PlayerMatchModel>.from(game.players);
-    players[idx] = players[idx].copyWith(isChallengedDeclard: true);
-    game = game.copyWith(players: players, isChallengeComplete: false);
-    await _persist(game);
-    await endTurn(fromChallenge: true);
+    await _emitMove(await _matchRepository.declareChallenge(state!.code));
+    await ensureAutoDraw();
   }
 
   Future<void> endTurn({bool fromChallenge = false}) async {
     if (!fromChallenge && !canEndTurn()) return;
     if (isMatchOver) return;
-
-    final gameSnapshot = _cloneState();
-    final current = gameSnapshot.turn ?? 0;
-    final othersAlreadyChallenged = gameSnapshot.players.any(
-      (p) => p.seat != current && (p.isChallengedDeclard ?? false),
-    );
-
-    // Response turn finished → resolve challenges before advancing.
-    if (othersAlreadyChallenged) {
-      await _resolveChallenges();
-      if (isMatchOver) return;
-    }
-
-    var game = _cloneState();
-    final newTurn = current == 1 ? 0 : 1;
-    var players = List<PlayerMatchModel>.from(game.players);
-    final currentIdx = _indexForSeat(players, current);
-    final newIdx = _indexForSeat(players, newTurn);
-    if (currentIdx != null) {
-      players[currentIdx] = players[currentIdx].copyWith(actionsComplete: false);
-    }
-    if (newIdx != null) {
-      players[newIdx] = players[newIdx].copyWith(
-        actionsComplete: false,
-        eliminationLocked: false,
-      );
-    }
-
-    // New turn starts now — timer progress is (now - turnStartTime) / duration on all clients.
-    final newTime = DateTime.now().toUtc();
-    game = game.copyWith(
-      players: players,
-      turn: newTurn,
-      turnStartTime: newTime,
-      drawnCard: null,
-      powerStartTime: null,
-    );
-    await _persist(
-      game,
-      clearDrawnCard: true,
-      includeDrawnCard: true,
-      clearPowerTime: true,
-      seatsToWrite: [if (currentIdx != null) currentIdx],
-    );
-    if (newIdx != null) {
-      final next = game.players[newIdx];
-      if (next.playerId != null) {
-        await _matchRepository.updateSeat(game.code, next.playerId!, {
-          'actions_complete': false,
-          'elimination_locked': false,
-        });
-      }
-    }
+    await _emitMove(await _matchRepository.endTurn(state!.code));
     await ensureAutoDraw();
   }
 
-  Future<void> _resolveChallenges() async {
-    final game = _cloneState();
-    final challengers = <int>[];
-    for (var i = 0; i < game.players.length; i++) {
-      if (game.players[i].isChallengedDeclard ?? false) challengers.add(i);
-    }
-    if (challengers.isEmpty) return;
-
-    if (challengers.length == 1) {
-      final i = challengers.first;
-      final points = game.players[i].handPoints();
-      if (points <= GameConstants.challengePointLimit) {
-        await _endAsWinner(i, EndReason.challenge);
-      } else {
-        var g = _applyPenalty(game, playerIndex: i, lockElimination: false);
-        final players = List<PlayerMatchModel>.from(g.players);
-        for (var j = 0; j < players.length; j++) {
-          players[j] = players[j].copyWith(isChallengedDeclard: false);
-        }
-        g = g.copyWith(players: players, isChallengeComplete: true);
-        await _persist(g, seatsToWrite: List<int>.generate(players.length, (i) => i));
-        if (_isDisqualified(g.players[i])) {
-          await _endAsWinner(opponentOf(i), EndReason.penalties);
-        }
-      }
+  Future<void> forfeitWinForRemainingPlayer() async {
+    if (getUserIndex() == null || isMatchOver) return;
+    try {
+      await _emitMove(await _matchRepository.winByDisconnect(state!.code));
+    } on ServerException {
       return;
     }
-
-    int best = challengers.first;
-    bool tie = false;
-    for (final i in challengers.skip(1)) {
-      final pi = game.players[i].handPoints();
-      final pb = game.players[best].handPoints();
-      if (pi < pb) {
-        best = i;
-        tie = false;
-      } else if (pi == pb) {
-        tie = true;
-      }
-    }
-
-    if (tie) {
-      await _endAsDraw(EndReason.challengeTie);
-    } else {
-      await _endAsWinner(best, EndReason.challenge);
-    }
   }
 
-  GameModel _applyPenalty(GameModel game, {required int playerIndex, required bool lockElimination}) {
-    game = _ensureDrawPile(game);
-    final card = game.drawDeck!.getCardFromDeck() as CardModel?;
-    final players = List<PlayerMatchModel>.from(game.players);
-    final hand = List<CardModel>.from(players[playerIndex].playerHand ?? []);
-    if (card != null) hand.insert(0, card);
-    players[playerIndex] = players[playerIndex].copyWith(
-      playerHand: hand,
-      penaltyCount: players[playerIndex].penaltyCount + 1,
-      eliminationLocked: lockElimination ? true : players[playerIndex].eliminationLocked,
-    );
-    return game.copyWith(players: players, drawDeck: game.drawDeck);
-  }
-
-  bool _isDisqualified(PlayerMatchModel p) => p.penaltyCount >= GameConstants.maxPenalties;
-
-  int opponentOf(int index) => index == 0 ? 1 : 0;
-
-  Future<void> _checkEmptyHandWin(int playerIndex) async {
-    final hand = state?.players[playerIndex].playerHand;
-    if (hand != null && hand.isEmpty) {
-      await _endAsWinner(playerIndex, EndReason.emptyHand);
-    }
-  }
-
-  Future<void> _endAsWinner(int playerIndex, String reason) async {
-    if (state == null || playerIndex >= state!.players.length) return;
-    final winner = state!.players[playerIndex];
-    final game = state!.copyWith(
-      winner: winner,
-      endReason: reason,
-      isActive: false,
-      isChallengeComplete: true,
-    );
-    await _matchRepository.updateMatch(game.code, {
-      'winner': {
-        ...winner.toMap(),
-        'end_reason': reason,
-      },
-      'is_active': false,
-      'is_challenge_complete': true,
-    });
-    emit(game);
-  }
-
-  Future<void> _endAsDraw(String reason) async {
-    if (state == null) return;
-    const draw = PlayerMatchModel(playerId: GameConstants.drawWinnerId);
-    final game = state!.copyWith(
-      winner: draw,
-      endReason: reason,
-      isActive: false,
-      isChallengeComplete: true,
-    );
-    await _matchRepository.updateMatch(game.code, {
-      'winner': {
-        ...draw.toMap(),
-        'end_reason': reason,
-      },
-      'is_active': false,
-      'is_challenge_complete': true,
-    });
-    emit(game);
-  }
-
-  Future<void> forfeitWinForRemainingPlayer() async {
-    final idx = getUserIndex();
-    if (idx == null || isMatchOver) return;
-    await _endAsWinner(idx, EndReason.disconnect);
-  }
-
-  /// Human-readable end explanation for the local player.
   String resultExplanation({required bool iWon, required bool isDraw}) {
     switch (state?.endReason) {
       case EndReason.emptyHand:
@@ -627,7 +249,6 @@ class MatchCubit extends Cubit<GameModel?> {
     emit(state!.copyWith(players: players));
   }
 
-  /// Returns true if opponent has been gone longer than reconnect timeout.
   bool opponentTimedOut() {
     final idx = getUserIndex();
     if (idx == null || state == null || state!.players.length < 2) return false;
@@ -639,73 +260,9 @@ class MatchCubit extends Cubit<GameModel?> {
     return DateTime.now().toUtc().difference(last).inSeconds >= GameConstants.reconnectTimeoutSeconds;
   }
 
-  GameModel _ensureDrawPile(GameModel game) {
-    if (game.drawDeck?.cardDeck?.isNotEmpty ?? false) return game;
-    final discard = List<CardModel>.from(game.discardDeck?.cardDeck ?? []);
-    if (discard.length <= 1) return game;
-    final top = discard.removeLast();
-    discard.shuffle();
-    return game.copyWith(
-      drawDeck: Deck(list: discard),
-      discardDeck: Deck(list: [top]),
-    );
-  }
-
-  GameModel _cloneState() {
-    final s = state!;
-    return GameModel.fromMap(s.toMap()).copyWith(
-      players: s.players.map((p) => PlayerMatchModel.fromMap(p.toMap()).copyWith(loadedPlayer: p.loadedPlayer)).toList(),
-      drawDeck: s.drawDeck == null ? null : Deck(list: List<CardModel>.from(s.drawDeck!.cardDeck ?? [])),
-      discardDeck: s.discardDeck == null ? null : Deck(list: List<CardModel>.from(s.discardDeck!.cardDeck ?? [])),
-    );
-  }
-
-  Future<void> _persist(
-    GameModel game, {
-    bool clearDrawnCard = false,
-    bool includeDrawnCard = false,
-    bool clearPowerTime = false,
-    List<int>? seatsToWrite,
-  }) async {
-    final map = <String, dynamic>{
-      'draw_deck': game.drawDeck?.toMapList(),
-      'discard_deck': game.discardDeck?.toMapList(),
-      'turn': game.turn,
-      'is_challenge_complete': game.isChallengeComplete,
-      'is_active': game.isActive,
-    };
-    if (includeDrawnCard || clearDrawnCard) {
-      map['drawn_card'] = clearDrawnCard ? null : game.drawnCard?.toMap();
-    }
-    if (game.turnStartTime != null) {
-      map['turn_start_time'] = game.turnStartTime!.toUtc().toIso8601String();
-    }
-    if (clearPowerTime) {
-      map['power_start_time'] = null;
-    } else if (game.powerStartTime != null) {
-      map['power_start_time'] = game.powerStartTime!.toUtc().toIso8601String();
-    }
-    if (game.winner != null) {
-      map['winner'] = game.winner!.toMap();
-    }
-
-    await _matchRepository.updateMatch(game.code, map);
-
-    final dirty = seatsToWrite ?? [if (getUserIndex() != null) getUserIndex()!];
-    for (final i in dirty.toSet()) {
-      if (i < 0 || i >= game.players.length) continue;
-      final p = game.players[i];
-      if (p.playerId == null) continue;
-      await _matchRepository.updateSeat(game.code, p.playerId!, p.toSeatPatch());
-    }
-
-    emit(game.copyWith(players: _mergeLoadedPlayers(game.players)));
-  }
-
   Future<void> forfeitAndLeave() async {
-    final idx = getUserIndex();
-    if (idx != null && !isMatchOver && (state?.players.length ?? 0) >= 2) {
-      await _endAsWinner(opponentOf(idx), EndReason.forfeit);
+    if (getUserIndex() != null && !isMatchOver && (state?.players.length ?? 0) >= 2) {
+      await _emitMove(await _matchRepository.forfeit(state!.code));
     }
   }
 
@@ -735,7 +292,6 @@ class MatchCubit extends Cubit<GameModel?> {
     });
   }
 
-  // Legacy API used by old drag-discard UI
   Future<void> discardHand(int playerIndex, int cardIndex) async {
     if (playerIndex != getUserIndex()) return;
     if (state?.drawnCard != null) {
@@ -750,10 +306,7 @@ class MatchCubit extends Cubit<GameModel?> {
     return userIndex;
   }
 
-  int? _indexForSeat(List<PlayerMatchModel> players, int seat) {
-    final i = players.indexWhere((p) => p.seat == seat);
-    return i < 0 ? null : i;
-  }
+  int opponentOf(int index) => index == 0 ? 1 : 0;
 
   PlayerMatchModel? _playerAtSeat(GameModel game, int? seat) {
     if (seat == null) return null;
@@ -767,6 +320,10 @@ class MatchCubit extends Cubit<GameModel?> {
     final idx = getUserIndex();
     if (idx == null || state == null) return null;
     return state!.players[idx];
+  }
+
+  Future<void> _emitMove(GameModel game) async {
+    emit(game.copyWith(players: _mergeLoadedPlayers(game.players)));
   }
 
   List<PlayerMatchModel> _mergeLoadedPlayers(List<PlayerMatchModel> incoming) {

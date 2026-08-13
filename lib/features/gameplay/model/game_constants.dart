@@ -8,7 +8,7 @@ class GameConstants {
   static const String drawWinnerId = '__DRAW__';
 }
 
-/// Stored on the winner jsonb as `end_reason` (no DB migration).
+/// Stored on Match as `end_reason`.
 class EndReason {
   static const String emptyHand = 'empty_hand';
   static const String challenge = 'challenge';

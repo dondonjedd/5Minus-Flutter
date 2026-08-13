@@ -57,7 +57,7 @@ class LobbyController {
     if ((players?.length ?? 0) != maxPlayers) return;
     if (players!.any((p) => !(p.isReady ?? false))) return;
 
-    await _matchRepository.updateMatch(gameCode, {'has_started': true});
+    await _matchRepository.startMatch(gameCode);
 
     if (!context.mounted) return;
     navigateActiveGame(context, gameCode: gameCode);
@@ -92,8 +92,7 @@ class LobbyController {
         code: gameCode,
         players: [PlayerMatchModel(playerId: hostId, isReady: true, seat: 0)],
         gameType: 0,
-        isActive: false,
-        hasStarted: false,
+        status: 'lobby',
       );
       await _matchRepository.insertMatch(game);
     }
