@@ -370,7 +370,7 @@ class MatchCubit extends Cubit<GameModel?> {
       game = _applyPenalty(game, playerIndex: idx, lockElimination: true);
       await _persist(game);
       if (_isDisqualified(game.players[idx])) {
-        await _endAsWinner(opponentOf(idx));
+        await _endAsWinner(opponentOf(idx), EndReason.penalties);
       }
       return 'Wrong rank — elimination locked until your next turn';
     }
@@ -382,7 +382,7 @@ class MatchCubit extends Cubit<GameModel?> {
     await _persist(game);
 
     if (hand.isEmpty) {
-      await _endAsWinner(idx);
+      await _endAsWinner(idx, EndReason.emptyHand);
     }
     return null;
   }
@@ -452,7 +452,7 @@ class MatchCubit extends Cubit<GameModel?> {
       final i = challengers.first;
       final points = game.players[i].handPoints();
       if (points <= GameConstants.challengePointLimit) {
-        await _endAsWinner(i);
+        await _endAsWinner(i, EndReason.challenge);
       } else {
         var g = _applyPenalty(game, playerIndex: i, lockElimination: false);
         final players = List<PlayerMatchModel>.from(g.players);
@@ -462,7 +462,7 @@ class MatchCubit extends Cubit<GameModel?> {
         g = g.copyWith(players: players, isChallengeComplete: true);
         await _persist(g);
         if (_isDisqualified(g.players[i])) {
-          await _endAsWinner(opponentOf(i));
+          await _endAsWinner(opponentOf(i), EndReason.penalties);
         }
       }
       return;
@@ -482,9 +482,9 @@ class MatchCubit extends Cubit<GameModel?> {
     }
 
     if (tie) {
-      await _endAsDraw();
+      await _endAsDraw(EndReason.challengeTie);
     } else {
-      await _endAsWinner(best);
+      await _endAsWinner(best, EndReason.challenge);
     }
   }
 
@@ -509,16 +509,24 @@ class MatchCubit extends Cubit<GameModel?> {
   Future<void> _checkEmptyHandWin(int playerIndex) async {
     final hand = state?.players[playerIndex].playerHand;
     if (hand != null && hand.isEmpty) {
-      await _endAsWinner(playerIndex);
+      await _endAsWinner(playerIndex, EndReason.emptyHand);
     }
   }
 
-  Future<void> _endAsWinner(int playerIndex) async {
+  Future<void> _endAsWinner(int playerIndex, String reason) async {
     if (state == null || playerIndex >= state!.players.length) return;
     final winner = state!.players[playerIndex];
-    final game = state!.copyWith(winner: winner, isActive: false, isChallengeComplete: true);
+    final game = state!.copyWith(
+      winner: winner,
+      endReason: reason,
+      isActive: false,
+      isChallengeComplete: true,
+    );
     await _client.from('matches').update({
-      'winner': winner.toMap(),
+      'winner': {
+        ...winner.toMap(),
+        'end_reason': reason,
+      },
       'is_active': false,
       'is_challenge_complete': true,
       'players': game.players.map((e) => e.toMap()).toList(),
@@ -526,12 +534,20 @@ class MatchCubit extends Cubit<GameModel?> {
     emit(game);
   }
 
-  Future<void> _endAsDraw() async {
+  Future<void> _endAsDraw(String reason) async {
     if (state == null) return;
     const draw = PlayerMatchModel(playerId: GameConstants.drawWinnerId);
-    final game = state!.copyWith(winner: draw, isActive: false, isChallengeComplete: true);
+    final game = state!.copyWith(
+      winner: draw,
+      endReason: reason,
+      isActive: false,
+      isChallengeComplete: true,
+    );
     await _client.from('matches').update({
-      'winner': draw.toMap(),
+      'winner': {
+        ...draw.toMap(),
+        'end_reason': reason,
+      },
       'is_active': false,
       'is_challenge_complete': true,
     }).eq('game_code', game.code);
@@ -541,7 +557,32 @@ class MatchCubit extends Cubit<GameModel?> {
   Future<void> forfeitWinForRemainingPlayer() async {
     final idx = getUserIndex();
     if (idx == null || isMatchOver) return;
-    await _endAsWinner(idx);
+    await _endAsWinner(idx, EndReason.disconnect);
+  }
+
+  /// Human-readable end explanation for the local player.
+  String resultExplanation({required bool iWon, required bool isDraw}) {
+    switch (state?.endReason) {
+      case EndReason.emptyHand:
+        return iWon ? 'You cleared all your cards.' : 'Opponent cleared all their cards.';
+      case EndReason.challenge:
+        return iWon ? 'You won by challenge.' : 'Opponent won by challenge.';
+      case EndReason.challengeTie:
+        return 'Both challenged with the same hand points.';
+      case EndReason.penalties:
+        return iWon
+            ? 'Opponent reached ${GameConstants.maxPenalties} penalties.'
+            : 'You reached ${GameConstants.maxPenalties} penalties.';
+      case EndReason.forfeit:
+        return iWon ? 'Opponent left the game.' : 'You left the game.';
+      case EndReason.disconnect:
+        return iWon
+            ? 'Opponent disconnected and timed out.'
+            : 'You disconnected and timed out.';
+      default:
+        if (isDraw) return 'The match ended in a draw.';
+        return iWon ? 'You won the match.' : 'You lost the match.';
+    }
   }
 
   Future<void> heartbeat() async {
@@ -648,7 +689,7 @@ class MatchCubit extends Cubit<GameModel?> {
   Future<void> forfeitAndLeave() async {
     final idx = getUserIndex();
     if (idx != null && !isMatchOver && (state?.players.length ?? 0) >= 2) {
-      await _endAsWinner(opponentOf(idx));
+      await _endAsWinner(opponentOf(idx), EndReason.forfeit);
     }
   }
 

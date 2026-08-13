@@ -22,6 +22,8 @@ class GameModel {
   final DateTime? powerStartTime;
   final bool? isChallengeComplete;
   final PlayerMatchModel? winner;
+  /// Why the match ended; persisted inside winner jsonb as `end_reason`.
+  final String? endReason;
 
   const GameModel({
     required this.hostId,
@@ -38,6 +40,7 @@ class GameModel {
     this.powerStartTime,
     this.isChallengeComplete = false,
     this.winner,
+    this.endReason,
   });
 
   /// Timestamps are always normalised to UTC so that values read back from
@@ -73,6 +76,9 @@ class GameModel {
         winner: data['winner'] == null
             ? null
             : PlayerMatchModel.fromMap(Map<String, dynamic>.from(data['winner'] as Map)),
+        endReason: data['winner'] is Map
+            ? (data['winner'] as Map)['end_reason'] as String?
+            : data['end_reason'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -89,7 +95,12 @@ class GameModel {
         'turn_start_time': turnStartTime?.toUtc().toIso8601String(),
         'power_start_time': powerStartTime?.toUtc().toIso8601String(),
         'is_challenge_complete': isChallengeComplete,
-        'winner': winner?.toMap(),
+        'winner': winner == null
+            ? null
+            : {
+                ...winner!.toMap(),
+                if (endReason != null) 'end_reason': endReason,
+              },
       };
 
   factory GameModel.fromJson(String data) {
@@ -111,6 +122,7 @@ class GameModel {
     Object? powerStartTime = _unset,
     bool? isChallengeComplete,
     Object? winner = _unset,
+    Object? endReason = _unset,
   }) {
     return GameModel(
       hostId: hostId,
@@ -127,6 +139,7 @@ class GameModel {
       powerStartTime: identical(powerStartTime, _unset) ? this.powerStartTime : powerStartTime as DateTime?,
       isChallengeComplete: isChallengeComplete ?? this.isChallengeComplete,
       winner: identical(winner, _unset) ? this.winner : winner as PlayerMatchModel?,
+      endReason: identical(endReason, _unset) ? this.endReason : endReason as String?,
     );
   }
 }

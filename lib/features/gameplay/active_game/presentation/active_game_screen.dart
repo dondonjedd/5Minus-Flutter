@@ -193,6 +193,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     final isDraw = cubit.isDraw;
     final iWon = !isDraw && cubit.state?.winner?.playerId == cubit.state?.players[userIndex ?? 0].playerId;
     final title = isDraw ? 'Draw' : (iWon ? 'You win!' : 'You lose');
+    final explanation = cubit.resultExplanation(iWon: iWon, isDraw: isDraw);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       showDialog(
@@ -200,6 +201,8 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           title: Text(title),
+          content: Text(explanation),
+          contentTextStyle: const TextStyle(color: Colors.black, fontSize: 18),
           actions: [
             TextButton(
               onPressed: () {
@@ -339,9 +342,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     },
                                     jackSelected: _jackPicks,
                                     onCardTap: (i) => _onOwnCardTap(matchCubit, i),
-                                    onCardDoubleTap: matchCubit.canEliminate()
-                                        ? (i) => _onOwnCardDoubleTap(matchCubit, i)
-                                        : null,
+                                    onCardDoubleTap: matchCubit.canEliminate() ? (i) => _onOwnCardDoubleTap(matchCubit, i) : null,
                                     onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
                                     onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
                                   ),
