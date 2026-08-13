@@ -240,6 +240,13 @@ update public.matches
 set winner_user_id = null
 where winner_user_id = '__DRAW__';
 
+-- Finished rows from before end_reason existed all have a winner.
+update public.matches
+set end_reason = 'empty_hand'
+where status = 'finished'
+  and end_reason is null
+  and winner_user_id is not null;
+
 revoke update on table public.matches from anon, authenticated;
 drop policy if exists "matches_update_host_lobby" on public.matches;
 
