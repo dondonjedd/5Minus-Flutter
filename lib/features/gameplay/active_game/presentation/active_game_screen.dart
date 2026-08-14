@@ -69,6 +69,8 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   int? _eliminatePlayerIndex;
   int? _eliminateHandIndex;
   bool _eliminateCardRemoved = false;
+  bool _eliminateCollapsing = false;
+  Timer? _eliminateCollapseTimer;
   final Map<String, GlobalKey> _handCardKeys = {};
   List<List<CardModel>> _lastHands = [];
 
@@ -80,6 +82,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     _gameSubscription?.cancel();
     _heartbeat?.cancel();
     _reconnectCheck?.cancel();
+    _eliminateCollapseTimer?.cancel();
     super.dispose();
   }
 
@@ -253,7 +256,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   Future<void> _onOwnCardDoubleTap(MatchCubit cubit, int handIndex) async {
-    if (!cubit.canEliminate() || _eliminateFlightCard != null) return;
+    if (!cubit.canEliminate() || _eliminatePlayerIndex != null) return;
     final me = userIndex;
     if (me == null) return;
     final card = cubit.state?.players[me].playerHand?[handIndex];
@@ -264,18 +267,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       _eliminatePlayerIndex = me;
       _eliminateHandIndex = handIndex;
       _eliminateCardRemoved = false;
+      _eliminateCollapsing = false;
     });
 
     final err = await cubit.eliminateCard(handIndex);
     if (!mounted) return;
     if (err != null) {
-      setState(() {
-        _eliminateFlightCard = null;
-        _eliminatePlayerIndex = null;
-        _eliminateHandIndex = null;
-        _eliminateCardRemoved = false;
-        _statusMessage = err;
-      });
+      _clearEliminateFlight(statusMessage: err);
       return;
     }
     if (_eliminateFlightCard != null) {
@@ -365,7 +363,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   void _maybeStartEliminateFlight(GameModel state) {
-    if (_eliminateFlightCard != null) return;
+    if (_eliminatePlayerIndex != null) return;
     final previousHands = _lastHands;
     if (previousHands.length != state.players.length) return;
     for (var i = 0; i < state.players.length; i++) {
@@ -390,11 +388,31 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
 
   void _onEliminateFlightCompleted() {
     if (!mounted) return;
+    if (!_eliminateCardRemoved || _eliminateHandIndex == null) {
+      _clearEliminateFlight();
+      return;
+    }
+    setState(() {
+      _eliminateFlightCard = null;
+      _eliminateCollapsing = true;
+    });
+    _eliminateCollapseTimer?.cancel();
+    _eliminateCollapseTimer = Timer(PlayerHands.collapseDuration, () {
+      if (!mounted) return;
+      _clearEliminateFlight();
+    });
+  }
+
+  void _clearEliminateFlight({String? statusMessage}) {
+    _eliminateCollapseTimer?.cancel();
+    _eliminateCollapseTimer = null;
     setState(() {
       _eliminateFlightCard = null;
       _eliminatePlayerIndex = null;
       _eliminateHandIndex = null;
       _eliminateCardRemoved = false;
+      _eliminateCollapsing = false;
+      if (statusMessage != null) _statusMessage = statusMessage;
     });
   }
 
@@ -500,6 +518,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       cardKeyFor: (i) => _handCardKey(oppIndex, i),
                                       hollowIndex: _eliminatePlayerIndex == oppIndex ? _eliminateHandIndex : null,
                                       hollowIsExtra: _eliminatePlayerIndex == oppIndex && _eliminateCardRemoved,
+                                      hollowCollapsing: _eliminatePlayerIndex == oppIndex && _eliminateCollapsing,
                                     ),
                                   ),
                           ),
@@ -580,7 +599,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     },
                                     jackSelected: _jackPicks,
                                     onCardTap: (i) => _onOwnCardTap(matchCubit, i),
-                                    onCardDoubleTap: matchCubit.canEliminate() && _eliminateFlightCard == null
+                                    onCardDoubleTap: matchCubit.canEliminate() && _eliminatePlayerIndex == null
                                         ? (i) => _onOwnCardDoubleTap(matchCubit, i)
                                         : null,
                                     onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
@@ -588,6 +607,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     cardKeyFor: (i) => _handCardKey(userIndex!, i),
                                     hollowIndex: _eliminatePlayerIndex == userIndex ? _eliminateHandIndex : null,
                                     hollowIsExtra: _eliminatePlayerIndex == userIndex && _eliminateCardRemoved,
+                                    hollowCollapsing: _eliminatePlayerIndex == userIndex && _eliminateCollapsing,
                                   ),
                           ),
                         ],
@@ -639,6 +659,7 @@ class PlayerView extends StatelessWidget {
     this.cardKeyFor,
     this.hollowIndex,
     this.hollowIsExtra = false,
+    this.hollowCollapsing = false,
   });
 
   final int? userIndex;
@@ -654,6 +675,7 @@ class PlayerView extends StatelessWidget {
   final GlobalKey Function(int handIndex)? cardKeyFor;
   final int? hollowIndex;
   final bool hollowIsExtra;
+  final bool hollowCollapsing;
 
   @override
   Widget build(BuildContext context) {
@@ -703,6 +725,7 @@ class PlayerView extends StatelessWidget {
               cardKeyFor: cardKeyFor,
               hollowIndex: hollowIndex,
               hollowIsExtra: hollowIsExtra,
+              hollowCollapsing: hollowCollapsing,
             ),
           ),
         ),

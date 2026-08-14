@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../enums/enum_card_power.dart';
+import '../../../model/card_model.dart';
 import '../../../model/game_model.dart';
 import 'back_card_widget.dart';
 import 'front_card_widget.dart';
@@ -28,6 +29,7 @@ class PlayerHands extends StatelessWidget {
     this.cardKeyFor,
     this.hollowIndex,
     this.hollowIsExtra = false,
+    this.hollowCollapsing = false,
   });
 
   final int playerIndex;
@@ -40,6 +42,9 @@ class PlayerHands extends StatelessWidget {
   final GlobalKey Function(int handIndex)? cardKeyFor;
   final int? hollowIndex;
   final bool hollowIsExtra;
+  final bool hollowCollapsing;
+
+  static const Duration collapseDuration = Duration(milliseconds: 800);
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +71,7 @@ class PlayerHands extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: KeyedSubtree(
-                key: hide ? cardKeyFor?.call(handIndex) : null,
+                key: hide ? cardKeyFor?.call(handIndex) : ValueKey(_cardId(hand[handIndex])),
                 child: hide
                     ? const SizedBox(width: 40, height: 60)
                     : GestureDetector(
@@ -98,13 +103,17 @@ class PlayerHands extends StatelessWidget {
   }
 
   Widget _hollowSlot(int index) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: KeyedSubtree(
-        key: cardKeyFor?.call(index),
-        child: const SizedBox(width: 40, height: 60),
-      ),
+    return AnimatedContainer(
+      key: cardKeyFor?.call(index),
+      duration: collapseDuration,
+      curve: Curves.easeInOutCubic,
+      width: hollowCollapsing ? 0 : 56,
+      height: 60,
     );
+  }
+
+  String _cardId(CardModel card) {
+    return '${card.suit?.internalRepresentation}-${card.rank?.internalRepresentation}';
   }
 
   bool _isInteractive(HandInteractionMode mode, bool opponent) {
