@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -7,24 +8,26 @@ import '../../../model/card_model.dart';
 import 'back_card_widget.dart';
 import 'front_card_widget.dart';
 
-/// Overlay that flies a face-down card from the deck to the drawn slot, then
-/// optionally flips it face-up. Parent hides the static drawn card until
+/// Overlay that flies a face-down card from [sourceKey] to [destKey], then
+/// optionally flips it face-up. Parent hides the static destination until
 /// [onCompleted].
 class DrawCardFlight extends StatefulWidget {
   const DrawCardFlight({
     super.key,
     required this.card,
     required this.revealFace,
-    required this.deckKey,
-    required this.drawnSlotKey,
+    required this.sourceKey,
+    required this.destKey,
     required this.onCompleted,
+    this.holdAfter = Duration.zero,
   });
 
   final CardModel card;
   final bool revealFace;
-  final GlobalKey deckKey;
-  final GlobalKey drawnSlotKey;
+  final GlobalKey sourceKey;
+  final GlobalKey destKey;
   final VoidCallback onCompleted;
+  final Duration holdAfter;
 
   @override
   State<DrawCardFlight> createState() => _DrawCardFlightState();
@@ -46,6 +49,7 @@ class _DrawCardFlightState extends State<DrawCardFlight> with SingleTickerProvid
   Offset? _end;
   bool _started = false;
   bool _completed = false;
+  Timer? _holdTimer;
 
   @override
   void initState() {
@@ -70,11 +74,22 @@ class _DrawCardFlightState extends State<DrawCardFlight> with SingleTickerProvid
 
   @override
   void dispose() {
+    _holdTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   void _finish() {
+    if (_completed || !mounted) return;
+    if (widget.holdAfter > Duration.zero) {
+      _holdTimer?.cancel();
+      _holdTimer = Timer(widget.holdAfter, _complete);
+      return;
+    }
+    _complete();
+  }
+
+  void _complete() {
     if (_completed || !mounted) return;
     _completed = true;
     widget.onCompleted();
@@ -89,15 +104,15 @@ class _DrawCardFlightState extends State<DrawCardFlight> with SingleTickerProvid
   void _startFlight() {
     if (!mounted) return;
     final layerBox = _layerKey.currentContext?.findRenderObject() as RenderBox?;
-    final deck = _globalCenter(widget.deckKey);
-    final slot = _globalCenter(widget.drawnSlotKey);
-    if (layerBox == null || !layerBox.hasSize || !layerBox.attached || deck == null || slot == null) {
+    final source = _globalCenter(widget.sourceKey);
+    final dest = _globalCenter(widget.destKey);
+    if (layerBox == null || !layerBox.hasSize || !layerBox.attached || source == null || dest == null) {
       _finish();
       return;
     }
     setState(() {
-      _start = layerBox.globalToLocal(deck);
-      _end = layerBox.globalToLocal(slot);
+      _start = layerBox.globalToLocal(source);
+      _end = layerBox.globalToLocal(dest);
       _started = true;
     });
     _controller.forward();

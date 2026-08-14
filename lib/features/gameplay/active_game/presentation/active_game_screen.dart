@@ -65,6 +65,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool _sawGameState = false;
   bool _hadDrawnCard = false;
 
+  CardModel? _eliminateFlightCard;
+  int? _eliminatePlayerIndex;
+  int? _eliminateHandIndex;
+  bool _eliminateCardRemoved = false;
+  final Map<String, GlobalKey> _handCardKeys = {};
+  List<List<CardModel>> _lastHands = [];
+
   static const Size _drawnCardSize = Size(40, 60);
   static const double _drawnCardTilt = 0.18;
 
@@ -241,10 +248,42 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     }
   }
 
+  GlobalKey _handCardKey(int playerIndex, int handIndex) {
+    return _handCardKeys.putIfAbsent('$playerIndex:$handIndex', GlobalKey.new);
+  }
+
   Future<void> _onOwnCardDoubleTap(MatchCubit cubit, int handIndex) async {
-    if (!cubit.canEliminate()) return;
+    if (!cubit.canEliminate() || _eliminateFlightCard != null) return;
+    final me = userIndex;
+    if (me == null) return;
+    final card = cubit.state?.players[me].playerHand?[handIndex];
+    if (card == null) return;
+
+    setState(() {
+      _eliminateFlightCard = card;
+      _eliminatePlayerIndex = me;
+      _eliminateHandIndex = handIndex;
+      _eliminateCardRemoved = false;
+    });
+
     final err = await cubit.eliminateCard(handIndex);
-    setState(() => _statusMessage = err);
+    if (!mounted) return;
+    if (err != null) {
+      setState(() {
+        _eliminateFlightCard = null;
+        _eliminatePlayerIndex = null;
+        _eliminateHandIndex = null;
+        _eliminateCardRemoved = false;
+        _statusMessage = err;
+      });
+      return;
+    }
+    if (_eliminateFlightCard != null) {
+      setState(() {
+        _eliminateCardRemoved = true;
+        _statusMessage = null;
+      });
+    }
   }
 
   Future<void> _onOpponentCardTap(MatchCubit cubit, int handIndex) async {
@@ -286,6 +325,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     if (!_sawGameState) {
       _sawGameState = true;
       _hadDrawnCard = state.drawnCard != null;
+      _lastHands = _handsOf(state);
       return;
     }
     final hasDrawn = state.drawnCard != null;
@@ -296,11 +336,66 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       });
     }
     _hadDrawnCard = hasDrawn;
+    _maybeStartEliminateFlight(state);
+    _lastHands = _handsOf(state);
+  }
+
+  List<List<CardModel>> _handsOf(GameModel state) {
+    return [
+      for (final player in state.players) List<CardModel>.from(player.playerHand ?? const []),
+    ];
+  }
+
+  int? _removedHandIndex(List<CardModel> previous, List<CardModel> next) {
+    if (next.length != previous.length - 1) return null;
+    for (var i = 0; i < previous.length; i++) {
+      var j = 0;
+      var matches = true;
+      for (var k = 0; k < previous.length; k++) {
+        if (k == i) continue;
+        if (j >= next.length || previous[k] != next[j]) {
+          matches = false;
+          break;
+        }
+        j++;
+      }
+      if (matches) return i;
+    }
+    return 0;
+  }
+
+  void _maybeStartEliminateFlight(GameModel state) {
+    if (_eliminateFlightCard != null) return;
+    final previousHands = _lastHands;
+    if (previousHands.length != state.players.length) return;
+    for (var i = 0; i < state.players.length; i++) {
+      final previous = previousHands[i];
+      final next = state.players[i].playerHand ?? const <CardModel>[];
+      final index = _removedHandIndex(previous, next);
+      if (index == null) continue;
+      setState(() {
+        _eliminateFlightCard = previous[index];
+        _eliminatePlayerIndex = i;
+        _eliminateHandIndex = index;
+        _eliminateCardRemoved = true;
+      });
+      return;
+    }
   }
 
   void _onDrawFlightCompleted() {
     if (!mounted) return;
     setState(() => _drawFlightCard = null);
+  }
+
+  void _onEliminateFlightCompleted() {
+    if (!mounted) return;
+    setState(() {
+      _eliminateFlightCard = null;
+      _eliminatePlayerIndex = null;
+      _eliminateHandIndex = null;
+      _eliminateCardRemoved = false;
+    });
   }
 
   void _maybeShowResult(MatchCubit cubit) {
@@ -402,6 +497,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       onCardTap: (i) => _onOpponentCardTap(matchCubit, i),
                                       onChallenge: null,
                                       onEndTurn: null,
+                                      cardKeyFor: (i) => _handCardKey(oppIndex, i),
+                                      hollowIndex: _eliminatePlayerIndex == oppIndex ? _eliminateHandIndex : null,
+                                      hollowIsExtra: _eliminatePlayerIndex == oppIndex && _eliminateCardRemoved,
                                     ),
                                   ),
                           ),
@@ -482,9 +580,14 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     },
                                     jackSelected: _jackPicks,
                                     onCardTap: (i) => _onOwnCardTap(matchCubit, i),
-                                    onCardDoubleTap: matchCubit.canEliminate() ? (i) => _onOwnCardDoubleTap(matchCubit, i) : null,
+                                    onCardDoubleTap: matchCubit.canEliminate() && _eliminateFlightCard == null
+                                        ? (i) => _onOwnCardDoubleTap(matchCubit, i)
+                                        : null,
                                     onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
                                     onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
+                                    cardKeyFor: (i) => _handCardKey(userIndex!, i),
+                                    hollowIndex: _eliminatePlayerIndex == userIndex ? _eliminateHandIndex : null,
+                                    hollowIsExtra: _eliminatePlayerIndex == userIndex && _eliminateCardRemoved,
                                   ),
                           ),
                         ],
@@ -496,9 +599,20 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                         child: DrawCardFlight(
                           card: _drawFlightCard!,
                           revealFace: _drawFlightReveal,
-                          deckKey: _deckKey,
-                          drawnSlotKey: _drawnSlotKey,
+                          sourceKey: _deckKey,
+                          destKey: _drawnSlotKey,
                           onCompleted: _onDrawFlightCompleted,
+                        ),
+                      ),
+                    if (_eliminateFlightCard != null && _eliminatePlayerIndex != null && _eliminateHandIndex != null)
+                      Positioned.fill(
+                        child: DrawCardFlight(
+                          card: _eliminateFlightCard!,
+                          revealFace: true,
+                          sourceKey: _handCardKey(_eliminatePlayerIndex!, _eliminateHandIndex!),
+                          destKey: _discardPileKey,
+                          holdAfter: const Duration(milliseconds: 1000),
+                          onCompleted: _onEliminateFlightCompleted,
                         ),
                       ),
                   ],
@@ -522,6 +636,9 @@ class PlayerView extends StatelessWidget {
     this.onCardDoubleTap,
     this.onChallenge,
     this.onEndTurn,
+    this.cardKeyFor,
+    this.hollowIndex,
+    this.hollowIsExtra = false,
   });
 
   final int? userIndex;
@@ -534,6 +651,9 @@ class PlayerView extends StatelessWidget {
   final void Function(int handIndex)? onCardDoubleTap;
   final VoidCallback? onChallenge;
   final VoidCallback? onEndTurn;
+  final GlobalKey Function(int handIndex)? cardKeyFor;
+  final int? hollowIndex;
+  final bool hollowIsExtra;
 
   @override
   Widget build(BuildContext context) {
@@ -580,6 +700,9 @@ class PlayerView extends StatelessWidget {
               jackSelected: jackSelected,
               onCardTap: onCardTap,
               onCardDoubleTap: onCardDoubleTap,
+              cardKeyFor: cardKeyFor,
+              hollowIndex: hollowIndex,
+              hollowIsExtra: hollowIsExtra,
             ),
           ),
         ),

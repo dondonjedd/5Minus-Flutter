@@ -25,6 +25,9 @@ class PlayerHands extends StatelessWidget {
     this.onCardTap,
     this.onCardDoubleTap,
     this.jackSelected,
+    this.cardKeyFor,
+    this.hollowIndex,
+    this.hollowIsExtra = false,
   });
 
   final int playerIndex;
@@ -34,49 +37,73 @@ class PlayerHands extends StatelessWidget {
   final void Function(int handIndex)? onCardTap;
   final void Function(int handIndex)? onCardDoubleTap;
   final Set<String>? jackSelected; // "playerIndex:handIndex"
+  final GlobalKey Function(int handIndex)? cardKeyFor;
+  final int? hollowIndex;
+  final bool hollowIsExtra;
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MatchCubit, GameModel?>(
       builder: (context, state) {
         final hand = state?.players[playerIndex].playerHand ?? [];
+        final extra = hollowIsExtra && hollowIndex != null;
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           scrollDirection: Axis.horizontal,
-          itemCount: hand.length,
-          itemBuilder: (context, index) {
-            final showFront = revealedIndexes.contains(index);
-            final selected = jackSelected?.contains('$playerIndex:$index') ?? false;
+          itemCount: hand.length + (extra ? 1 : 0),
+          itemBuilder: (context, visualIndex) {
+            if (extra && visualIndex == hollowIndex) {
+              return _hollowSlot(visualIndex);
+            }
+            final handIndex = extra && visualIndex > hollowIndex! ? visualIndex - 1 : visualIndex;
+            final hide = !extra && hollowIndex == handIndex;
+            final showFront = revealedIndexes.contains(handIndex);
+            final selected = jackSelected?.contains('$playerIndex:$handIndex') ?? false;
             final singleTappable = onCardTap != null && _isInteractive(mode, isOpponent);
             final doubleTappable = onCardDoubleTap != null && !isOpponent;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: GestureDetector(
-                onTap: singleTappable ? () => onCardTap!(index) : null,
-                onDoubleTap: doubleTappable ? () => onCardDoubleTap!(index) : null,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    showFront ? FrontCard(cardModel: hand[index]) : BackCard(cardModel: hand[index]),
-                    if (selected)
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle),
+              child: KeyedSubtree(
+                key: hide ? cardKeyFor?.call(handIndex) : null,
+                child: hide
+                    ? const SizedBox(width: 40, height: 60)
+                    : GestureDetector(
+                        onTap: singleTappable ? () => onCardTap!(handIndex) : null,
+                        onDoubleTap: doubleTappable ? () => onCardDoubleTap!(handIndex) : null,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            showFront ? FrontCard(cardModel: hand[handIndex]) : BackCard(cardModel: hand[handIndex]),
+                            if (selected)
+                              Positioned(
+                                top: -4,
+                                right: -4,
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
               ),
             );
           },
         );
       },
+    );
+  }
+
+  Widget _hollowSlot(int index) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: KeyedSubtree(
+        key: cardKeyFor?.call(index),
+        child: const SizedBox(width: 40, height: 60),
+      ),
     );
   }
 
