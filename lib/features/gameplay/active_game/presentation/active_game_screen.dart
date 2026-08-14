@@ -19,6 +19,7 @@ import '../../../../core/component/template/screen_template_view.dart';
 import '../../../../core/utility/loading_overlay_utility.dart';
 import 'active_game_controller.dart';
 import 'widgets/discard_pile_widget.dart';
+import 'widgets/draw_card_flight.dart';
 import 'widgets/game_overlay.dart';
 import 'widgets/player_hands_widget.dart';
 
@@ -54,9 +55,15 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   String? _statusMessage;
 
   final GlobalKey _discardPileKey = GlobalKey();
+  final GlobalKey _deckKey = GlobalKey();
+  final GlobalKey _drawnSlotKey = GlobalKey();
   Offset _drawnCardDragAnchor = Offset.zero;
   bool _drawnCardOverPile = false;
   CardModel? _pendingDiscardCard;
+  CardModel? _drawFlightCard;
+  bool _drawFlightReveal = false;
+  bool _sawGameState = false;
+  bool _hadDrawnCard = false;
 
   static const Size _drawnCardSize = Size(40, 60);
   static const double _drawnCardTilt = 0.18;
@@ -274,6 +281,28 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     }
   }
 
+  void _maybeStartDrawFlight(MatchCubit cubit, GameModel? state) {
+    if (state == null) return;
+    if (!_sawGameState) {
+      _sawGameState = true;
+      _hadDrawnCard = state.drawnCard != null;
+      return;
+    }
+    final hasDrawn = state.drawnCard != null;
+    if (!_hadDrawnCard && hasDrawn && _drawFlightCard == null) {
+      setState(() {
+        _drawFlightCard = state.drawnCard;
+        _drawFlightReveal = cubit.isMyTurn();
+      });
+    }
+    _hadDrawnCard = hasDrawn;
+  }
+
+  void _onDrawFlightCompleted() {
+    if (!mounted) return;
+    setState(() => _drawFlightCard = null);
+  }
+
   void _maybeShowResult(MatchCubit cubit) {
     if (!cubit.isMatchOver || _resultShown || !mounted) return;
     _resultShown = true;
@@ -308,7 +337,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   Widget build(BuildContext context) {
     return BlocConsumer<MatchCubit, GameModel?>(
       listener: (context, state) {
-        _maybeShowResult(context.read<MatchCubit>());
+        final matchCubit = context.read<MatchCubit>();
+        _maybeShowResult(matchCubit);
+        _maybeStartDrawFlight(matchCubit, state);
       },
       builder: (context, state) {
         final matchCubit = context.read<MatchCubit>();
@@ -383,37 +414,45 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Expanded(
-                                      child: (state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
-                                          ? UnconstrainedBox(
-                                              child: SizedBox(
-                                                height: 80,
-                                                child: Image.asset(AssetPath.drawDeck5Plus, fit: BoxFit.contain),
-                                              ),
-                                            )
-                                          : const SizedBox.expand(),
+                                      child: KeyedSubtree(
+                                        key: _deckKey,
+                                        child: (state?.drawDeck?.cardDeck?.isNotEmpty ?? false)
+                                            ? UnconstrainedBox(
+                                                child: SizedBox(
+                                                  height: 80,
+                                                  child: Image.asset(AssetPath.drawDeck5Plus, fit: BoxFit.contain),
+                                                ),
+                                              )
+                                            : const SizedBox.expand(),
+                                      ),
                                     ),
                                     Expanded(
-                                      child: (state?.drawnCard == null || _pendingDiscardCard != null)
-                                          ? const SizedBox.expand()
-                                          : matchCubit.canDiscardOrReplace()
-                                              ? Draggable<CardModel>(
-                                                  data: state!.drawnCard!,
-                                                  dragAnchorStrategy: _drawnCardAnchorStrategy,
-                                                  onDragUpdate: _onDrawnCardDragUpdate,
-                                                  onDragEnd: _onDrawnCardDragEnd,
-                                                  feedback: Material(
-                                                    color: Colors.transparent,
-                                                    child: Transform.rotate(
-                                                      angle: _drawnCardTilt,
-                                                      child: FrontCard(cardModel: state.drawnCard!),
+                                      child: KeyedSubtree(
+                                        key: _drawnSlotKey,
+                                        child: (state?.drawnCard == null ||
+                                                _pendingDiscardCard != null ||
+                                                _drawFlightCard != null)
+                                            ? const SizedBox.expand()
+                                            : matchCubit.canDiscardOrReplace()
+                                                ? Draggable<CardModel>(
+                                                    data: state!.drawnCard!,
+                                                    dragAnchorStrategy: _drawnCardAnchorStrategy,
+                                                    onDragUpdate: _onDrawnCardDragUpdate,
+                                                    onDragEnd: _onDrawnCardDragEnd,
+                                                    feedback: Material(
+                                                      color: Colors.transparent,
+                                                      child: Transform.rotate(
+                                                        angle: _drawnCardTilt,
+                                                        child: FrontCard(cardModel: state.drawnCard!),
+                                                      ),
                                                     ),
-                                                  ),
-                                                  childWhenDragging: const SizedBox(width: 40, height: 60),
-                                                  child: FrontCard(cardModel: state.drawnCard!),
-                                                )
-                                              : matchCubit.isMyTurn()
-                                                  ? FrontCard(cardModel: state!.drawnCard!)
-                                                  : BackCard(cardModel: state!.drawnCard!),
+                                                    childWhenDragging: const SizedBox(width: 40, height: 60),
+                                                    child: FrontCard(cardModel: state.drawnCard!),
+                                                  )
+                                                : matchCubit.isMyTurn()
+                                                    ? FrontCard(cardModel: state!.drawnCard!)
+                                                    : BackCard(cardModel: state!.drawnCard!),
+                                      ),
                                     ),
                                     Expanded(
                                       flex: 2,
@@ -452,6 +491,16 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                       ),
                     ),
                     const Positioned.fill(child: GameOverlay()),
+                    if (_drawFlightCard != null)
+                      Positioned.fill(
+                        child: DrawCardFlight(
+                          card: _drawFlightCard!,
+                          revealFace: _drawFlightReveal,
+                          deckKey: _deckKey,
+                          drawnSlotKey: _drawnSlotKey,
+                          onCompleted: _onDrawFlightCompleted,
+                        ),
+                      ),
                   ],
                 ),
         );
