@@ -87,6 +87,10 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   bool _replaceHideDrawnSlot = false;
   Timer? _replaceDrawnHoldTimer;
 
+  CardModel? _sabotageFlightCard;
+  int? _sabotagePlayerIndex;
+  int? _sabotageHandIndex;
+
   static const Size _drawnCardSize = Size(40, 60);
   static const double _drawnCardTilt = 0.18;
 
@@ -350,6 +354,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     }
     _maybeStartEliminateFlight(state);
     _maybeStartReplaceFlight(state);
+    _maybeStartSabotageFlight(state);
     _hadDrawnCard = hasDrawn;
     if (state.drawnCard != null) _lastDrawnCard = state.drawnCard;
     _lastHands = _handsOf(state);
@@ -393,6 +398,44 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
         _eliminatePlayerIndex = i;
         _eliminateHandIndex = index;
         _eliminateCardRemoved = true;
+      });
+      return;
+    }
+  }
+
+  int? _addedHandIndex(List<CardModel> previous, List<CardModel> next) {
+    if (next.length != previous.length + 1) return null;
+    for (var i = 0; i < next.length; i++) {
+      var j = 0;
+      var matches = true;
+      for (var k = 0; k < next.length; k++) {
+        if (k == i) continue;
+        if (j >= previous.length || next[k] != previous[j]) {
+          matches = false;
+          break;
+        }
+        j++;
+      }
+      if (matches) return i;
+    }
+    return 0;
+  }
+
+  void _maybeStartSabotageFlight(GameModel state) {
+    if (_sabotagePlayerIndex != null) return;
+    final pile = state.discardDeck?.cardDeck;
+    if (pile == null || pile.isEmpty || pile.last.cardPower != CardPower.sabotage) return;
+    final previousHands = _lastHands;
+    if (previousHands.length != state.players.length) return;
+    for (var i = 0; i < state.players.length; i++) {
+      final previous = previousHands[i];
+      final next = state.players[i].playerHand ?? const <CardModel>[];
+      final index = _addedHandIndex(previous, next);
+      if (index == null) continue;
+      setState(() {
+        _sabotageFlightCard = next[index];
+        _sabotagePlayerIndex = i;
+        _sabotageHandIndex = index;
       });
       return;
     }
@@ -532,6 +575,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
 
   int? _hollowIndexFor(int playerIndex) {
     if (_eliminatePlayerIndex == playerIndex) return _eliminateHandIndex;
+    if (_sabotagePlayerIndex == playerIndex && _sabotageFlightCard != null) {
+      return _sabotageHandIndex;
+    }
     if (_replacePlayerIndex == playerIndex &&
         (_replaceIncomingCard != null || _replaceAwaitingCommit) &&
         (_replaceIncomingReady || _replaceOutgoingReady)) {
@@ -588,6 +634,15 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   void _onDrawFlightCompleted() {
     if (!mounted) return;
     setState(() => _drawFlightCard = null);
+  }
+
+  void _onSabotageFlightCompleted() {
+    if (!mounted) return;
+    setState(() {
+      _sabotageFlightCard = null;
+      _sabotagePlayerIndex = null;
+      _sabotageHandIndex = null;
+    });
   }
 
   void _onEliminateFlightCompleted() {
@@ -848,6 +903,17 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                           holdAfter: const Duration(milliseconds: 1000),
                           onStarted: _onReplaceOutgoingStarted,
                           onCompleted: _onReplaceOutgoingCompleted,
+                        ),
+                      ),
+                    if (_sabotageFlightCard != null && _sabotagePlayerIndex != null && _sabotageHandIndex != null)
+                      Positioned.fill(
+                        key: const ValueKey('sabotage-flight'),
+                        child: DrawCardFlight(
+                          card: _sabotageFlightCard!,
+                          face: CardFlightFace.hidden,
+                          sourceKey: _deckKey,
+                          destKey: _handCardKey(_sabotagePlayerIndex!, _sabotageHandIndex!),
+                          onCompleted: _onSabotageFlightCompleted,
                         ),
                       ),
                   ],
