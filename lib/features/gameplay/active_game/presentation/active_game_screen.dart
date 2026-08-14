@@ -56,6 +56,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   final GlobalKey _discardPileKey = GlobalKey();
   Offset _drawnCardDragAnchor = Offset.zero;
   bool _drawnCardOverPile = false;
+  CardModel? _pendingDiscardCard;
 
   static const Size _drawnCardSize = Size(40, 60);
   static const double _drawnCardTilt = 0.18;
@@ -177,8 +178,18 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
 
   void _onDrawnCardDragEnd(DraggableDetails details) {
     final over = _cardOverlapsDiscardPile(details.offset);
+    if (over) {
+      final card = context.read<MatchCubit>().state?.drawnCard;
+      setState(() {
+        _drawnCardOverPile = false;
+        _pendingDiscardCard = card;
+      });
+      context.read<MatchCubit>().discardDrawnCard().whenComplete(() {
+        if (mounted) setState(() => _pendingDiscardCard = null);
+      });
+      return;
+    }
     _setDrawnCardOverPile(false);
-    if (over) context.read<MatchCubit>().discardDrawnCard();
   }
 
   HandInteractionMode _modeFor(MatchCubit cubit) {
@@ -382,7 +393,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                           : const SizedBox.expand(),
                                     ),
                                     Expanded(
-                                      child: (state?.drawnCard == null)
+                                      child: (state?.drawnCard == null || _pendingDiscardCard != null)
                                           ? const SizedBox.expand()
                                           : matchCubit.canDiscardOrReplace()
                                               ? Draggable<CardModel>(
@@ -409,6 +420,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       child: DiscardPile(
                                         key: _discardPileKey,
                                         highlighted: _drawnCardOverPile,
+                                        pendingTopCard: _pendingDiscardCard,
                                       ),
                                     ),
                                   ],

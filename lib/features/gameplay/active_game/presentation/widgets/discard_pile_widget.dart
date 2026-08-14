@@ -12,19 +12,22 @@ class DiscardPile extends StatelessWidget {
   const DiscardPile({
     super.key,
     this.highlighted = false,
+    this.pendingTopCard,
   });
 
   final bool highlighted;
+  final CardModel? pendingTopCard;
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MatchCubit, GameModel?>(
       builder: (context, state) {
-        List<CardModel> discardPileCardList = state?.discardDeck?.cardDeck ?? [];
+        final discardPileCardList = state?.discardDeck?.cardDeck ?? [];
+        final topCard = pendingTopCard ?? (discardPileCardList.isNotEmpty ? discardPileCardList.last : null);
         return DottedBorder(
           color: highlighted ? Colors.black : Colors.white,
           borderType: BorderType.Circle,
-          child: (discardPileCardList.isNotEmpty)
+          child: (topCard != null)
               ? Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -46,7 +49,7 @@ class DiscardPile extends StatelessWidget {
                             left: 0,
                             bottom: 0,
                             top: 0,
-                            child: FrontCard(cardModel: discardPileCardList.last),
+                            child: FrontCard(cardModel: topCard),
                           ),
                         ],
                       ),
