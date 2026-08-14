@@ -59,7 +59,7 @@ class PlayerHands extends StatelessWidget {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    showFront ? FrontCard(cardModel: hand[index]) : const BackCard(),
+                    showFront ? FrontCard(cardModel: hand[index]) : BackCard(cardModel: hand[index]),
                     if (selected)
                       Positioned(
                         top: -4,

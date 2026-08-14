@@ -311,7 +311,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 // Face-up only for the active player; opponent sees the back.
-                                                if (matchCubit.isMyTurn()) FrontCard(cardModel: state!.drawnCard!) else const BackCard(),
+                                                if (matchCubit.isMyTurn()) FrontCard(cardModel: state!.drawnCard!) else BackCard(cardModel: state!.drawnCard!),
                                                 if (matchCubit.canDiscardOrReplace())
                                                   TextButton(
                                                     onPressed: () => matchCubit.discardDrawnCard(),
