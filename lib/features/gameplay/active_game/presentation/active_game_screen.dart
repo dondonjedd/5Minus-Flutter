@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:five_minus/features/gameplay/active_game/presentation/cubit/match_cubit.dart';
 import 'package:five_minus/features/gameplay/active_game/presentation/widgets/back_card_widget.dart';
@@ -8,6 +9,7 @@ import 'package:five_minus/features/gameplay/active_game/presentation/widgets/pl
 import 'package:five_minus/features/gameplay/enums/enum_card_power.dart';
 import 'package:five_minus/features/gameplay/model/active_game_params.dart';
 import 'package:five_minus/features/gameplay/model/game_constants.dart';
+import 'package:five_minus/features/gameplay/model/card_model.dart';
 import 'package:five_minus/features/gameplay/model/game_model.dart';
 import 'package:five_minus/resource/asset_path.dart';
 import 'package:flutter/material.dart';
@@ -50,6 +52,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   final Set<String> _jackPicks = {};
 
   String? _statusMessage;
+
+  final GlobalKey _discardPileKey = GlobalKey();
+  Offset _drawnCardDragAnchor = Offset.zero;
+  bool _drawnCardOverPile = false;
+
+  static const Size _drawnCardSize = Size(40, 60);
+  static const double _drawnCardTilt = 0.18;
 
   @override
   void dispose() {
@@ -102,6 +111,74 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
         _peekDone = true;
       });
     });
+  }
+
+  Offset _drawnCardAnchorStrategy(Draggable<Object> _, BuildContext context, Offset position) {
+    final box = context.findRenderObject()! as RenderBox;
+    _drawnCardDragAnchor = box.globalToLocal(position);
+    return _drawnCardDragAnchor;
+  }
+
+  Rect _rotatedDrawnCardRect(Offset topLeft) {
+    final center = topLeft + Offset(_drawnCardSize.width / 2, _drawnCardSize.height / 2);
+    final hw = _drawnCardSize.width / 2;
+    final hh = _drawnCardSize.height / 2;
+    final cosA = math.cos(_drawnCardTilt);
+    final sinA = math.sin(_drawnCardTilt);
+    final corners = <Offset>[
+      Offset(-hw, -hh),
+      Offset(hw, -hh),
+      Offset(hw, hh),
+      Offset(-hw, hh),
+    ];
+    var minX = double.infinity;
+    var minY = double.infinity;
+    var maxX = double.negativeInfinity;
+    var maxY = double.negativeInfinity;
+    for (final corner in corners) {
+      final rotated = Offset(
+            corner.dx * cosA - corner.dy * sinA,
+            corner.dx * sinA + corner.dy * cosA,
+          ) +
+          center;
+      minX = math.min(minX, rotated.dx);
+      minY = math.min(minY, rotated.dy);
+      maxX = math.max(maxX, rotated.dx);
+      maxY = math.max(maxY, rotated.dy);
+    }
+    return Rect.fromLTRB(minX, minY, maxX, maxY);
+  }
+
+  bool _cardOverlapsDiscardPile(Offset cardTopLeft) {
+    final pileBox = _discardPileKey.currentContext?.findRenderObject() as RenderBox?;
+    if (pileBox == null || !pileBox.hasSize || !pileBox.attached) return false;
+
+    final pileRect = pileBox.localToGlobal(Offset.zero) & pileBox.size;
+    final cardRect = _rotatedDrawnCardRect(cardTopLeft);
+    final center = pileRect.center;
+    final radius = math.min(pileRect.width, pileRect.height) / 2;
+    if (radius <= 0) return false;
+
+    final closest = Offset(
+      center.dx.clamp(cardRect.left, cardRect.right),
+      center.dy.clamp(cardRect.top, cardRect.bottom),
+    );
+    return (closest - center).distance <= radius;
+  }
+
+  void _setDrawnCardOverPile(bool over) {
+    if (_drawnCardOverPile == over) return;
+    setState(() => _drawnCardOverPile = over);
+  }
+
+  void _onDrawnCardDragUpdate(DragUpdateDetails details) {
+    _setDrawnCardOverPile(_cardOverlapsDiscardPile(details.globalPosition - _drawnCardDragAnchor));
+  }
+
+  void _onDrawnCardDragEnd(DraggableDetails details) {
+    final over = _cardOverlapsDiscardPile(details.offset);
+    _setDrawnCardOverPile(false);
+    if (over) context.read<MatchCubit>().discardDrawnCard();
   }
 
   HandInteractionMode _modeFor(MatchCubit cubit) {
@@ -307,20 +384,33 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     Expanded(
                                       child: (state?.drawnCard == null)
                                           ? const SizedBox.expand()
-                                          : Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                // Face-up only for the active player; opponent sees the back.
-                                                if (matchCubit.isMyTurn()) FrontCard(cardModel: state!.drawnCard!) else BackCard(cardModel: state!.drawnCard!),
-                                                if (matchCubit.canDiscardOrReplace())
-                                                  TextButton(
-                                                    onPressed: () => matchCubit.discardDrawnCard(),
-                                                    child: const Text('Discard'),
+                                          : matchCubit.canDiscardOrReplace()
+                                              ? Draggable<CardModel>(
+                                                  data: state!.drawnCard!,
+                                                  dragAnchorStrategy: _drawnCardAnchorStrategy,
+                                                  onDragUpdate: _onDrawnCardDragUpdate,
+                                                  onDragEnd: _onDrawnCardDragEnd,
+                                                  feedback: Material(
+                                                    color: Colors.transparent,
+                                                    child: Transform.rotate(
+                                                      angle: _drawnCardTilt,
+                                                      child: FrontCard(cardModel: state.drawnCard!),
+                                                    ),
                                                   ),
-                                              ],
-                                            ),
+                                                  childWhenDragging: const SizedBox(width: 40, height: 60),
+                                                  child: FrontCard(cardModel: state.drawnCard!),
+                                                )
+                                              : matchCubit.isMyTurn()
+                                                  ? FrontCard(cardModel: state!.drawnCard!)
+                                                  : BackCard(cardModel: state!.drawnCard!),
                                     ),
-                                    const Expanded(flex: 2, child: DiscardPile()),
+                                    Expanded(
+                                      flex: 2,
+                                      child: DiscardPile(
+                                        key: _discardPileKey,
+                                        highlighted: _drawnCardOverPile,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

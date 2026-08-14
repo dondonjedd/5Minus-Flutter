@@ -11,57 +11,56 @@ import 'front_card_widget.dart';
 class DiscardPile extends StatelessWidget {
   const DiscardPile({
     super.key,
+    this.highlighted = false,
   });
+
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
-    return DragTarget<CardModel>(
-        onAcceptWithDetails: (details) {},
-        builder: (ctx, candidateData, rejectedData) {
-          return BlocBuilder<MatchCubit, GameModel?>(
-            builder: (context, state) {
-              List<CardModel> discardPileCardList = state?.discardDeck?.cardDeck ?? [];
-              return DottedBorder(
-                color: candidateData.isNotEmpty ? Colors.black : Colors.white,
-                borderType: BorderType.Circle,
-                child: (discardPileCardList.isNotEmpty)
-                    ? Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: candidateData.isNotEmpty ? Colors.black.withValues(alpha: 0.15) : null,
-                        ),
-                        height: double.infinity,
-                        width: double.infinity,
-                        child: UnconstrainedBox(
-                          child: SizedBox(
-                            height: 70,
-                            child: Stack(
-                              children: [
-                                Image.asset(
-                                  AssetPath.discardPile4Plus,
-                                  fit: BoxFit.contain,
-                                ),
-                                Positioned(
-                                  right: 0,
-                                  left: 0,
-                                  bottom: 0,
-                                  top: 0,
-                                  child: FrontCard(cardModel: discardPileCardList.last),
-                                ),
-                              ],
-                            ),
+    return BlocBuilder<MatchCubit, GameModel?>(
+      builder: (context, state) {
+        List<CardModel> discardPileCardList = state?.discardDeck?.cardDeck ?? [];
+        return DottedBorder(
+          color: highlighted ? Colors.black : Colors.white,
+          borderType: BorderType.Circle,
+          child: (discardPileCardList.isNotEmpty)
+              ? Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: highlighted ? Colors.black.withValues(alpha: 0.15) : null,
+                  ),
+                  height: double.infinity,
+                  width: double.infinity,
+                  child: UnconstrainedBox(
+                    child: SizedBox(
+                      height: 70,
+                      child: Stack(
+                        children: [
+                          Image.asset(
+                            AssetPath.discardPile4Plus,
+                            fit: BoxFit.contain,
                           ),
-                        ),
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: candidateData.isNotEmpty ? Colors.black.withValues(alpha: 0.15) : null,
-                          shape: BoxShape.circle,
-                        ),
+                          Positioned(
+                            right: 0,
+                            left: 0,
+                            bottom: 0,
+                            top: 0,
+                            child: FrontCard(cardModel: discardPileCardList.last),
+                          ),
+                        ],
                       ),
-              );
-            },
-          );
-        });
+                    ),
+                  ),
+                )
+              : Container(
+                  decoration: BoxDecoration(
+                    color: highlighted ? Colors.black.withValues(alpha: 0.15) : null,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+        );
+      },
+    );
   }
 }
