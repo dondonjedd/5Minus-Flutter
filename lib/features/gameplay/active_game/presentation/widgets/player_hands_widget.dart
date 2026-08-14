@@ -67,33 +67,41 @@ class PlayerHands extends StatelessWidget {
             final selected = jackSelected?.contains('$playerIndex:$handIndex') ?? false;
             final singleTappable = onCardTap != null && _isInteractive(mode, isOpponent);
             final doubleTappable = onCardDoubleTap != null && !isOpponent;
+            final useFlightKey = cardKeyFor != null && !extra;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: KeyedSubtree(
-                key: hide ? cardKeyFor?.call(handIndex) : ValueKey(_cardId(hand[handIndex])),
-                child: hide
-                    ? const SizedBox(width: 40, height: 60)
-                    : GestureDetector(
-                        onTap: singleTappable ? () => onCardTap!(handIndex) : null,
-                        onDoubleTap: doubleTappable ? () => onCardDoubleTap!(handIndex) : null,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            showFront ? FrontCard(cardModel: hand[handIndex]) : BackCard(cardModel: hand[handIndex]),
-                            if (selected)
-                              Positioned(
-                                top: -4,
-                                right: -4,
-                                child: Container(
-                                  width: 14,
-                                  height: 14,
-                                  decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+              child: Align(
+                alignment: Alignment.center,
+                child: KeyedSubtree(
+                  key: useFlightKey ? cardKeyFor!(handIndex) : ValueKey(_cardId(hand[handIndex])),
+                  child: SizedBox(
+                    width: 40,
+                    height: 60,
+                    child: hide
+                        ? null
+                        : GestureDetector(
+                            onTap: singleTappable ? () => onCardTap!(handIndex) : null,
+                            onDoubleTap: doubleTappable ? () => onCardDoubleTap!(handIndex) : null,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                showFront ? FrontCard(cardModel: hand[handIndex]) : BackCard(cardModel: hand[handIndex]),
+                                if (selected)
+                                  Positioned(
+                                    top: -4,
+                                    right: -4,
+                                    child: Container(
+                                      width: 14,
+                                      height: 14,
+                                      decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
               ),
             );
           },
@@ -103,12 +111,15 @@ class PlayerHands extends StatelessWidget {
   }
 
   Widget _hollowSlot(int index) {
-    return AnimatedContainer(
-      key: cardKeyFor?.call(index),
-      duration: collapseDuration,
-      curve: Curves.easeInOutCubic,
-      width: hollowCollapsing ? 0 : 56,
-      height: 60,
+    return Align(
+      alignment: Alignment.center,
+      child: AnimatedContainer(
+        key: cardKeyFor?.call(index),
+        duration: collapseDuration,
+        curve: Curves.easeInOutCubic,
+        width: hollowCollapsing ? 0 : 56,
+        height: 60,
+      ),
     );
   }
 

@@ -73,6 +73,19 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   Timer? _eliminateCollapseTimer;
   final Map<String, GlobalKey> _handCardKeys = {};
   List<List<CardModel>> _lastHands = [];
+  CardModel? _lastDrawnCard;
+
+  CardModel? _replaceIncomingCard;
+  CardModel? _replaceOutgoingCard;
+  int? _replacePlayerIndex;
+  int? _replaceHandIndex;
+  CardFlightFace _replaceIncomingFace = CardFlightFace.hidden;
+  bool _replaceAwaitingCommit = false;
+  CardModel? _replaceFrozenPileTop;
+  bool _replaceIncomingReady = false;
+  bool _replaceOutgoingReady = false;
+  bool _replaceHideDrawnSlot = false;
+  Timer? _replaceDrawnHoldTimer;
 
   static const Size _drawnCardSize = Size(40, 60);
   static const double _drawnCardTilt = 0.18;
@@ -83,6 +96,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     _heartbeat?.cancel();
     _reconnectCheck?.cancel();
     _eliminateCollapseTimer?.cancel();
+    _replaceDrawnHoldTimer?.cancel();
     super.dispose();
   }
 
@@ -216,6 +230,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       if (power == CardPower.look) return HandInteractionMode.queenLook;
       if (power == CardPower.swap) return HandInteractionMode.jackPick;
     }
+    if (_replacePlayerIndex != null) return HandInteractionMode.none;
     // Single-tap = replace when a drawn card is pending. Eliminate is double-tap only.
     if (cubit.canDiscardOrReplace()) return HandInteractionMode.replace;
     return HandInteractionMode.none;
@@ -242,8 +257,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       return;
     }
     if (mode == HandInteractionMode.replace) {
-      await cubit.replaceHandCard(handIndex);
-      setState(() => _statusMessage = null);
+      await _startReplaceFlight(cubit, userIndex!, handIndex, concealIncoming: true);
       return;
     }
     if (mode == HandInteractionMode.jackPick) {
@@ -256,7 +270,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   Future<void> _onOwnCardDoubleTap(MatchCubit cubit, int handIndex) async {
-    if (!cubit.canEliminate() || _eliminatePlayerIndex != null) return;
+    if (!cubit.canEliminate() || _eliminatePlayerIndex != null || _replacePlayerIndex != null) return;
     final me = userIndex;
     if (me == null) return;
     final card = cubit.state?.players[me].playerHand?[handIndex];
@@ -323,6 +337,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     if (!_sawGameState) {
       _sawGameState = true;
       _hadDrawnCard = state.drawnCard != null;
+      _lastDrawnCard = state.drawnCard;
       _lastHands = _handsOf(state);
       return;
     }
@@ -333,8 +348,10 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
         _drawFlightReveal = cubit.isMyTurn();
       });
     }
-    _hadDrawnCard = hasDrawn;
     _maybeStartEliminateFlight(state);
+    _maybeStartReplaceFlight(state);
+    _hadDrawnCard = hasDrawn;
+    if (state.drawnCard != null) _lastDrawnCard = state.drawnCard;
     _lastHands = _handsOf(state);
   }
 
@@ -363,7 +380,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   void _maybeStartEliminateFlight(GameModel state) {
-    if (_eliminatePlayerIndex != null) return;
+    if (_eliminatePlayerIndex != null || _replacePlayerIndex != null) return;
     final previousHands = _lastHands;
     if (previousHands.length != state.players.length) return;
     for (var i = 0; i < state.players.length; i++) {
@@ -379,6 +396,193 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       });
       return;
     }
+  }
+
+  int? _replacedHandIndex(List<CardModel> previous, List<CardModel> next) {
+    if (previous.length != next.length) return null;
+    int? replaced;
+    for (var i = 0; i < previous.length; i++) {
+      if (previous[i] != next[i]) {
+        if (replaced != null) return null;
+        replaced = i;
+      }
+    }
+    return replaced;
+  }
+
+  void _maybeStartReplaceFlight(GameModel state) {
+    if (_replacePlayerIndex != null || _eliminatePlayerIndex != null) return;
+    if (!_hadDrawnCard || state.drawnCard != null) return;
+    final previousDrawn = _lastDrawnCard;
+    if (previousDrawn == null) return;
+    final previousHands = _lastHands;
+    if (previousHands.length != state.players.length) return;
+    for (var i = 0; i < state.players.length; i++) {
+      final previous = previousHands[i];
+      final next = state.players[i].playerHand ?? const <CardModel>[];
+      final index = _replacedHandIndex(previous, next);
+      if (index == null) continue;
+      final pile = state.discardDeck?.cardDeck ?? const <CardModel>[];
+      _beginReplaceFlight(
+        incoming: previousDrawn,
+        outgoing: previous[index],
+        playerIndex: i,
+        handIndex: index,
+        incomingFace: i == userIndex ? CardFlightFace.conceal : CardFlightFace.hidden,
+        frozenPileTop: pile.length >= 2 ? pile[pile.length - 2] : null,
+      );
+      return;
+    }
+  }
+
+  Future<void> _startReplaceFlight(
+    MatchCubit cubit,
+    int playerIndex,
+    int handIndex, {
+    required bool concealIncoming,
+  }) async {
+    if (_replacePlayerIndex != null || _eliminatePlayerIndex != null) return;
+    final incoming = cubit.state?.drawnCard;
+    final outgoing = cubit.state?.players[playerIndex].playerHand?[handIndex];
+    if (incoming == null || outgoing == null) return;
+
+    final pile = cubit.state?.discardDeck?.cardDeck ?? const <CardModel>[];
+    _beginReplaceFlight(
+      incoming: incoming,
+      outgoing: outgoing,
+      playerIndex: playerIndex,
+      handIndex: handIndex,
+      incomingFace: concealIncoming ? CardFlightFace.conceal : CardFlightFace.hidden,
+      awaitingCommit: true,
+      frozenPileTop: pile.isNotEmpty ? pile.last : null,
+    );
+
+    try {
+      await cubit.replaceHandCard(handIndex);
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = null;
+        _replaceAwaitingCommit = false;
+      });
+      _maybeClearReplaceFlight();
+    } catch (_) {
+      if (mounted) _clearReplaceFlight();
+    }
+  }
+
+  void _beginReplaceFlight({
+    required CardModel incoming,
+    required CardModel outgoing,
+    required int playerIndex,
+    required int handIndex,
+    required CardFlightFace incomingFace,
+    bool awaitingCommit = false,
+    CardModel? frozenPileTop,
+  }) {
+    setState(() {
+      _replaceIncomingCard = incoming;
+      _replaceOutgoingCard = outgoing;
+      _replacePlayerIndex = playerIndex;
+      _replaceHandIndex = handIndex;
+      _replaceIncomingFace = incomingFace;
+      _replaceAwaitingCommit = awaitingCommit;
+      _replaceFrozenPileTop = frozenPileTop;
+      _replaceIncomingReady = false;
+      _replaceOutgoingReady = false;
+      _replaceHideDrawnSlot = false;
+    });
+    _replaceDrawnHoldTimer?.cancel();
+    _replaceDrawnHoldTimer = null;
+  }
+
+  void _onReplaceIncomingCompleted() {
+    if (!mounted) return;
+    setState(() => _replaceIncomingCard = null);
+    _maybeClearReplaceFlight();
+  }
+
+  void _onReplaceOutgoingCompleted() {
+    if (!mounted) return;
+    setState(() => _replaceOutgoingCard = null);
+    _maybeClearReplaceFlight();
+  }
+
+  void _maybeClearReplaceFlight() {
+    if (_replaceIncomingCard != null || _replaceOutgoingCard != null) return;
+    if (_replaceAwaitingCommit) return;
+    _clearReplaceFlight();
+  }
+
+  void _clearReplaceFlight() {
+    _replaceDrawnHoldTimer?.cancel();
+    _replaceDrawnHoldTimer = null;
+    setState(() {
+      _replaceIncomingCard = null;
+      _replaceOutgoingCard = null;
+      _replacePlayerIndex = null;
+      _replaceHandIndex = null;
+      _replaceIncomingFace = CardFlightFace.hidden;
+      _replaceAwaitingCommit = false;
+      _replaceFrozenPileTop = null;
+      _replaceIncomingReady = false;
+      _replaceOutgoingReady = false;
+      _replaceHideDrawnSlot = false;
+    });
+  }
+
+  int? _hollowIndexFor(int playerIndex) {
+    if (_eliminatePlayerIndex == playerIndex) return _eliminateHandIndex;
+    if (_replacePlayerIndex == playerIndex &&
+        (_replaceIncomingCard != null || _replaceAwaitingCommit) &&
+        (_replaceIncomingReady || _replaceOutgoingReady)) {
+      return _replaceHandIndex;
+    }
+    return null;
+  }
+
+  void _onReplaceIncomingStarted() {
+    if (!mounted || _replaceIncomingReady) return;
+    setState(() => _replaceIncomingReady = true);
+    _replaceDrawnHoldTimer?.cancel();
+    _replaceDrawnHoldTimer = Timer(const Duration(milliseconds: 50), () {
+      if (!mounted) return;
+      setState(() => _replaceHideDrawnSlot = true);
+    });
+  }
+
+  void _onReplaceOutgoingStarted() {
+    if (!mounted || _replaceOutgoingReady) return;
+    setState(() => _replaceOutgoingReady = true);
+  }
+
+  Widget _drawnSlotContents(MatchCubit cubit, GameModel? state) {
+    if (_pendingDiscardCard != null || _drawFlightCard != null) {
+      return const SizedBox(width: 40, height: 60);
+    }
+    final live = state?.drawnCard;
+    final held = !_replaceHideDrawnSlot ? _replaceIncomingCard : null;
+    final card = live ?? held;
+    if (card == null) return const SizedBox(width: 40, height: 60);
+
+    if (live != null && cubit.canDiscardOrReplace()) {
+      return Draggable<CardModel>(
+        data: live,
+        dragAnchorStrategy: _drawnCardAnchorStrategy,
+        onDragUpdate: _onDrawnCardDragUpdate,
+        onDragEnd: _onDrawnCardDragEnd,
+        feedback: Material(
+          color: Colors.transparent,
+          child: Transform.rotate(
+            angle: _drawnCardTilt,
+            child: FrontCard(cardModel: live),
+          ),
+        ),
+        childWhenDragging: const SizedBox(width: 40, height: 60),
+        child: FrontCard(cardModel: live),
+      );
+    }
+    if (cubit.isMyTurn()) return FrontCard(cardModel: card);
+    return BackCard(cardModel: card);
   }
 
   void _onDrawFlightCompleted() {
@@ -516,7 +720,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       onChallenge: null,
                                       onEndTurn: null,
                                       cardKeyFor: (i) => _handCardKey(oppIndex, i),
-                                      hollowIndex: _eliminatePlayerIndex == oppIndex ? _eliminateHandIndex : null,
+                                      hollowIndex: _hollowIndexFor(oppIndex),
                                       hollowIsExtra: _eliminatePlayerIndex == oppIndex && _eliminateCardRemoved,
                                       hollowCollapsing: _eliminatePlayerIndex == oppIndex && _eliminateCollapsing,
                                     ),
@@ -544,31 +748,11 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       ),
                                     ),
                                     Expanded(
-                                      child: KeyedSubtree(
-                                        key: _drawnSlotKey,
-                                        child: (state?.drawnCard == null ||
-                                                _pendingDiscardCard != null ||
-                                                _drawFlightCard != null)
-                                            ? const SizedBox.expand()
-                                            : matchCubit.canDiscardOrReplace()
-                                                ? Draggable<CardModel>(
-                                                    data: state!.drawnCard!,
-                                                    dragAnchorStrategy: _drawnCardAnchorStrategy,
-                                                    onDragUpdate: _onDrawnCardDragUpdate,
-                                                    onDragEnd: _onDrawnCardDragEnd,
-                                                    feedback: Material(
-                                                      color: Colors.transparent,
-                                                      child: Transform.rotate(
-                                                        angle: _drawnCardTilt,
-                                                        child: FrontCard(cardModel: state.drawnCard!),
-                                                      ),
-                                                    ),
-                                                    childWhenDragging: const SizedBox(width: 40, height: 60),
-                                                    child: FrontCard(cardModel: state.drawnCard!),
-                                                  )
-                                                : matchCubit.isMyTurn()
-                                                    ? FrontCard(cardModel: state!.drawnCard!)
-                                                    : BackCard(cardModel: state!.drawnCard!),
+                                      child: Center(
+                                        child: KeyedSubtree(
+                                          key: _drawnSlotKey,
+                                          child: _drawnSlotContents(matchCubit, state),
+                                        ),
                                       ),
                                     ),
                                     Expanded(
@@ -577,6 +761,8 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                         key: _discardPileKey,
                                         highlighted: _drawnCardOverPile,
                                         pendingTopCard: _pendingDiscardCard,
+                                        lockTop: _replaceOutgoingCard != null,
+                                        lockedTopCard: _replaceFrozenPileTop,
                                       ),
                                     ),
                                   ],
@@ -599,13 +785,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     },
                                     jackSelected: _jackPicks,
                                     onCardTap: (i) => _onOwnCardTap(matchCubit, i),
-                                    onCardDoubleTap: matchCubit.canEliminate() && _eliminatePlayerIndex == null
+                                    onCardDoubleTap: matchCubit.canEliminate() && _eliminatePlayerIndex == null && _replacePlayerIndex == null
                                         ? (i) => _onOwnCardDoubleTap(matchCubit, i)
                                         : null,
                                     onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
                                     onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
                                     cardKeyFor: (i) => _handCardKey(userIndex!, i),
-                                    hollowIndex: _eliminatePlayerIndex == userIndex ? _eliminateHandIndex : null,
+                                    hollowIndex: _hollowIndexFor(userIndex!),
                                     hollowIsExtra: _eliminatePlayerIndex == userIndex && _eliminateCardRemoved,
                                     hollowCollapsing: _eliminatePlayerIndex == userIndex && _eliminateCollapsing,
                                   ),
@@ -616,9 +802,10 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                     const Positioned.fill(child: GameOverlay()),
                     if (_drawFlightCard != null)
                       Positioned.fill(
+                        key: const ValueKey('draw-flight'),
                         child: DrawCardFlight(
                           card: _drawFlightCard!,
-                          revealFace: _drawFlightReveal,
+                          face: _drawFlightReveal ? CardFlightFace.reveal : CardFlightFace.hidden,
                           sourceKey: _deckKey,
                           destKey: _drawnSlotKey,
                           onCompleted: _onDrawFlightCompleted,
@@ -626,13 +813,41 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                       ),
                     if (_eliminateFlightCard != null && _eliminatePlayerIndex != null && _eliminateHandIndex != null)
                       Positioned.fill(
+                        key: const ValueKey('eliminate-flight'),
                         child: DrawCardFlight(
                           card: _eliminateFlightCard!,
-                          revealFace: true,
+                          face: CardFlightFace.reveal,
                           sourceKey: _handCardKey(_eliminatePlayerIndex!, _eliminateHandIndex!),
                           destKey: _discardPileKey,
                           holdAfter: const Duration(milliseconds: 1000),
                           onCompleted: _onEliminateFlightCompleted,
+                        ),
+                      ),
+                    if (_replaceIncomingCard != null && _replacePlayerIndex != null && _replaceHandIndex != null)
+                      Positioned.fill(
+                        key: const ValueKey('replace-incoming-flight'),
+                        child: DrawCardFlight(
+                          card: _replaceIncomingCard!,
+                          face: _replaceIncomingFace,
+                          sourceKey: _drawnSlotKey,
+                          destKey: _handCardKey(_replacePlayerIndex!, _replaceHandIndex!),
+                          arcHeight: 0,
+                          flipAtEnd: true,
+                          onStarted: _onReplaceIncomingStarted,
+                          onCompleted: _onReplaceIncomingCompleted,
+                        ),
+                      ),
+                    if (_replaceOutgoingCard != null && _replacePlayerIndex != null && _replaceHandIndex != null)
+                      Positioned.fill(
+                        key: const ValueKey('replace-outgoing-flight'),
+                        child: DrawCardFlight(
+                          card: _replaceOutgoingCard!,
+                          face: CardFlightFace.reveal,
+                          sourceKey: _handCardKey(_replacePlayerIndex!, _replaceHandIndex!),
+                          destKey: _discardPileKey,
+                          holdAfter: const Duration(milliseconds: 1000),
+                          onStarted: _onReplaceOutgoingStarted,
+                          onCompleted: _onReplaceOutgoingCompleted,
                         ),
                       ),
                   ],

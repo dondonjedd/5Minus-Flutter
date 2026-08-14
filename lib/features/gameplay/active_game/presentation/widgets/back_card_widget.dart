@@ -12,9 +12,11 @@ class BackCard extends StatelessWidget {
   const BackCard({
     super.key,
     this.cardModel,
+    this.tight = false,
   });
 
   final CardModel? cardModel;
+  final bool tight;
 
   static bool get _revealHidden => kDebugMode && ConfigurationData.revealHiddenCards;
 
@@ -24,9 +26,17 @@ class BackCard extends StatelessWidget {
     if (_revealHidden && model != null && model.rank != null && model.suit != null) {
       return ImageFiltered(
         imageFilter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
-        child: FrontCard(cardModel: model),
+        child: FrontCard(cardModel: model, tight: tight),
       );
     }
-    return UnconstrainedBox(child: SizedBox(height: 60, child: Image.asset(AssetPath.backCard)));
+    final image = Image.asset(
+      AssetPath.backCard,
+      width: 40,
+      height: 60,
+      fit: BoxFit.fill,
+      filterQuality: FilterQuality.medium,
+      gaplessPlayback: true,
+    );
+    return tight ? image : UnconstrainedBox(child: image);
   }
 }
