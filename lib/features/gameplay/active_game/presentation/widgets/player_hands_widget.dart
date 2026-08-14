@@ -27,7 +27,7 @@ class PlayerHands extends StatelessWidget {
     this.onCardDoubleTap,
     this.jackSelected,
     this.cardKeyFor,
-    this.hollowIndex,
+    this.hollowIndexes = const {},
     this.hollowIsExtra = false,
     this.hollowCollapsing = false,
   });
@@ -40,7 +40,7 @@ class PlayerHands extends StatelessWidget {
   final void Function(int handIndex)? onCardDoubleTap;
   final Set<String>? jackSelected; // "playerIndex:handIndex"
   final GlobalKey Function(int handIndex)? cardKeyFor;
-  final int? hollowIndex;
+  final Set<int> hollowIndexes;
   final bool hollowIsExtra;
   final bool hollowCollapsing;
 
@@ -51,18 +51,19 @@ class PlayerHands extends StatelessWidget {
     return BlocBuilder<MatchCubit, GameModel?>(
       builder: (context, state) {
         final hand = state?.players[playerIndex].playerHand ?? [];
-        final extra = hollowIsExtra && hollowIndex != null;
+        final extra = hollowIsExtra && hollowIndexes.isNotEmpty;
+        final extraIndex = extra ? hollowIndexes.first : null;
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           scrollDirection: Axis.horizontal,
           itemCount: hand.length + (extra ? 1 : 0),
           itemBuilder: (context, visualIndex) {
-            if (extra && visualIndex == hollowIndex) {
+            if (extra && visualIndex == extraIndex) {
               return _hollowSlot(visualIndex);
             }
-            final handIndex = extra && visualIndex > hollowIndex! ? visualIndex - 1 : visualIndex;
-            final hide = !extra && hollowIndex == handIndex;
+            final handIndex = extra && visualIndex > extraIndex! ? visualIndex - 1 : visualIndex;
+            final hide = !extra && hollowIndexes.contains(handIndex);
             final showFront = revealedIndexes.contains(handIndex);
             final selected = jackSelected?.contains('$playerIndex:$handIndex') ?? false;
             final singleTappable = onCardTap != null && _isInteractive(mode, isOpponent);

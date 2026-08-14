@@ -18,7 +18,7 @@ class ConfigurationData {
   static const bool screenshotMode = false;
 
   /// Debug-only: show face-down cards as a blurred front. Still requires kDebugMode.
-  static const bool revealHiddenCards = false;
+  static const bool revealHiddenCards = true;
 
   static const int pageSize = 20;
 

@@ -91,6 +91,14 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   int? _sabotagePlayerIndex;
   int? _sabotageHandIndex;
 
+  CardModel? _swapCardA;
+  CardModel? _swapCardB;
+  int? _swapPlayerA;
+  int? _swapPlayerB;
+  int? _swapIndexA;
+  int? _swapIndexB;
+  bool _swapAwaitingCommit = false;
+
   static const Size _drawnCardSize = Size(40, 60);
   static const double _drawnCardTilt = 0.18;
 
@@ -228,13 +236,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   HandInteractionMode _modeFor(MatchCubit cubit) {
+    if (_swapPlayerA != null || _replacePlayerIndex != null) return HandInteractionMode.none;
     // Powers are only actionable on the active player's client.
     if (cubit.hasPendingPower && cubit.isMyTurn()) {
       final power = cubit.topDiscard?.cardPower;
       if (power == CardPower.look) return HandInteractionMode.queenLook;
       if (power == CardPower.swap) return HandInteractionMode.jackPick;
     }
-    if (_replacePlayerIndex != null) return HandInteractionMode.none;
     // Single-tap = replace when a drawn card is pending. Eliminate is double-tap only.
     if (cubit.canDiscardOrReplace()) return HandInteractionMode.replace;
     return HandInteractionMode.none;
@@ -274,7 +282,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   Future<void> _onOwnCardDoubleTap(MatchCubit cubit, int handIndex) async {
-    if (!cubit.canEliminate() || _eliminatePlayerIndex != null || _replacePlayerIndex != null) return;
+    if (!cubit.canEliminate() || _eliminatePlayerIndex != null || _replacePlayerIndex != null || _swapPlayerA != null) {
+      return;
+    }
     final me = userIndex;
     if (me == null) return;
     final card = cubit.state?.players[me].playerHand?[handIndex];
@@ -326,13 +336,38 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     });
     if (_jackPicks.length == 2) {
       final parts = _jackPicks.map((e) => e.split(':')).toList();
-      await cubit.resolveJackSwap(
-        playerIndexA: int.parse(parts[0][0]),
-        handIndexA: int.parse(parts[0][1]),
-        playerIndexB: int.parse(parts[1][0]),
-        handIndexB: int.parse(parts[1][1]),
+      final playerA = int.parse(parts[0][0]);
+      final indexA = int.parse(parts[0][1]);
+      final playerB = int.parse(parts[1][0]);
+      final indexB = int.parse(parts[1][1]);
+      final cardA = cubit.state?.players[playerA].playerHand?[indexA];
+      final cardB = cubit.state?.players[playerB].playerHand?[indexB];
+      if (cardA == null || cardB == null) {
+        setState(() => _jackPicks.clear());
+        return;
+      }
+      _beginSwapFlight(
+        playerA: playerA,
+        indexA: indexA,
+        cardA: cardA,
+        playerB: playerB,
+        indexB: indexB,
+        cardB: cardB,
+        awaitingCommit: true,
       );
-      setState(() => _jackPicks.clear());
+      try {
+        await cubit.resolveJackSwap(
+          playerIndexA: playerA,
+          handIndexA: indexA,
+          playerIndexB: playerB,
+          handIndexB: indexB,
+        );
+        if (!mounted) return;
+        setState(() => _swapAwaitingCommit = false);
+        _maybeClearSwapFlight();
+      } catch (_) {
+        if (mounted) _clearSwapFlight();
+      }
     }
   }
 
@@ -355,6 +390,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     _maybeStartEliminateFlight(state);
     _maybeStartReplaceFlight(state);
     _maybeStartSabotageFlight(state);
+    _maybeStartSwapFlight(state);
     _hadDrawnCard = hasDrawn;
     if (state.drawnCard != null) _lastDrawnCard = state.drawnCard;
     _lastHands = _handsOf(state);
@@ -439,6 +475,101 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       });
       return;
     }
+  }
+
+  ({int playerA, int indexA, CardModel cardA, int playerB, int indexB, CardModel cardB})? _findSwap(
+    List<List<CardModel>> previous,
+    GameModel state,
+  ) {
+    if (previous.length != state.players.length) return null;
+    final changes = <({int player, int index, CardModel from, CardModel to})>[];
+    for (var p = 0; p < state.players.length; p++) {
+      final prev = previous[p];
+      final next = state.players[p].playerHand ?? const <CardModel>[];
+      if (prev.length != next.length) return null;
+      for (var i = 0; i < prev.length; i++) {
+        if (prev[i] != next[i]) {
+          changes.add((player: p, index: i, from: prev[i], to: next[i]));
+        }
+      }
+    }
+    if (changes.length != 2) return null;
+    final a = changes[0];
+    final b = changes[1];
+    if (a.from != b.to || b.from != a.to) return null;
+    return (
+      playerA: a.player,
+      indexA: a.index,
+      cardA: a.from,
+      playerB: b.player,
+      indexB: b.index,
+      cardB: b.from,
+    );
+  }
+
+  void _maybeStartSwapFlight(GameModel state) {
+    if (_swapPlayerA != null) return;
+    final swap = _findSwap(_lastHands, state);
+    if (swap == null) return;
+    _beginSwapFlight(
+      playerA: swap.playerA,
+      indexA: swap.indexA,
+      cardA: swap.cardA,
+      playerB: swap.playerB,
+      indexB: swap.indexB,
+      cardB: swap.cardB,
+    );
+  }
+
+  void _beginSwapFlight({
+    required int playerA,
+    required int indexA,
+    required CardModel cardA,
+    required int playerB,
+    required int indexB,
+    required CardModel cardB,
+    bool awaitingCommit = false,
+  }) {
+    setState(() {
+      _jackPicks.clear();
+      _swapCardA = cardA;
+      _swapCardB = cardB;
+      _swapPlayerA = playerA;
+      _swapPlayerB = playerB;
+      _swapIndexA = indexA;
+      _swapIndexB = indexB;
+      _swapAwaitingCommit = awaitingCommit;
+    });
+  }
+
+  void _onSwapFlightACompleted() {
+    if (!mounted) return;
+    setState(() => _swapCardA = null);
+    _maybeClearSwapFlight();
+  }
+
+  void _onSwapFlightBCompleted() {
+    if (!mounted) return;
+    setState(() => _swapCardB = null);
+    _maybeClearSwapFlight();
+  }
+
+  void _maybeClearSwapFlight() {
+    if (_swapCardA != null || _swapCardB != null) return;
+    if (_swapAwaitingCommit) return;
+    _clearSwapFlight();
+  }
+
+  void _clearSwapFlight() {
+    setState(() {
+      _swapCardA = null;
+      _swapCardB = null;
+      _swapPlayerA = null;
+      _swapPlayerB = null;
+      _swapIndexA = null;
+      _swapIndexB = null;
+      _swapAwaitingCommit = false;
+    });
   }
 
   int? _replacedHandIndex(List<CardModel> previous, List<CardModel> next) {
@@ -573,17 +704,25 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     });
   }
 
-  int? _hollowIndexFor(int playerIndex) {
-    if (_eliminatePlayerIndex == playerIndex) return _eliminateHandIndex;
-    if (_sabotagePlayerIndex == playerIndex && _sabotageFlightCard != null) {
-      return _sabotageHandIndex;
+  Set<int> _hollowIndexesFor(int playerIndex) {
+    final indexes = <int>{};
+    if (_eliminatePlayerIndex == playerIndex && _eliminateHandIndex != null) {
+      indexes.add(_eliminateHandIndex!);
+    }
+    if (_sabotagePlayerIndex == playerIndex && _sabotageFlightCard != null && _sabotageHandIndex != null) {
+      indexes.add(_sabotageHandIndex!);
     }
     if (_replacePlayerIndex == playerIndex &&
         (_replaceIncomingCard != null || _replaceAwaitingCommit) &&
-        (_replaceIncomingReady || _replaceOutgoingReady)) {
-      return _replaceHandIndex;
+        (_replaceIncomingReady || _replaceOutgoingReady) &&
+        _replaceHandIndex != null) {
+      indexes.add(_replaceHandIndex!);
     }
-    return null;
+    if (_swapPlayerA != null) {
+      if (_swapPlayerA == playerIndex && _swapIndexA != null) indexes.add(_swapIndexA!);
+      if (_swapPlayerB == playerIndex && _swapIndexB != null) indexes.add(_swapIndexB!);
+    }
+    return indexes;
   }
 
   void _onReplaceIncomingStarted() {
@@ -775,7 +914,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       onChallenge: null,
                                       onEndTurn: null,
                                       cardKeyFor: (i) => _handCardKey(oppIndex, i),
-                                      hollowIndex: _hollowIndexFor(oppIndex),
+                                      hollowIndexes: _hollowIndexesFor(oppIndex),
                                       hollowIsExtra: _eliminatePlayerIndex == oppIndex && _eliminateCardRemoved,
                                       hollowCollapsing: _eliminatePlayerIndex == oppIndex && _eliminateCollapsing,
                                     ),
@@ -840,13 +979,16 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     },
                                     jackSelected: _jackPicks,
                                     onCardTap: (i) => _onOwnCardTap(matchCubit, i),
-                                    onCardDoubleTap: matchCubit.canEliminate() && _eliminatePlayerIndex == null && _replacePlayerIndex == null
+                                    onCardDoubleTap: matchCubit.canEliminate() &&
+                                            _eliminatePlayerIndex == null &&
+                                            _replacePlayerIndex == null &&
+                                            _swapPlayerA == null
                                         ? (i) => _onOwnCardDoubleTap(matchCubit, i)
                                         : null,
                                     onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
                                     onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
                                     cardKeyFor: (i) => _handCardKey(userIndex!, i),
-                                    hollowIndex: _hollowIndexFor(userIndex!),
+                                    hollowIndexes: _hollowIndexesFor(userIndex!),
                                     hollowIsExtra: _eliminatePlayerIndex == userIndex && _eliminateCardRemoved,
                                     hollowCollapsing: _eliminatePlayerIndex == userIndex && _eliminateCollapsing,
                                   ),
@@ -916,6 +1058,30 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                           onCompleted: _onSabotageFlightCompleted,
                         ),
                       ),
+                    if (_swapCardA != null && _swapPlayerA != null && _swapIndexA != null && _swapPlayerB != null && _swapIndexB != null)
+                      Positioned.fill(
+                        key: const ValueKey('swap-flight-a'),
+                        child: DrawCardFlight(
+                          card: _swapCardA!,
+                          face: CardFlightFace.hidden,
+                          sourceKey: _handCardKey(_swapPlayerA!, _swapIndexA!),
+                          destKey: _handCardKey(_swapPlayerB!, _swapIndexB!),
+                          arcHeight: 28,
+                          onCompleted: _onSwapFlightACompleted,
+                        ),
+                      ),
+                    if (_swapCardB != null && _swapPlayerA != null && _swapIndexA != null && _swapPlayerB != null && _swapIndexB != null)
+                      Positioned.fill(
+                        key: const ValueKey('swap-flight-b'),
+                        child: DrawCardFlight(
+                          card: _swapCardB!,
+                          face: CardFlightFace.hidden,
+                          sourceKey: _handCardKey(_swapPlayerB!, _swapIndexB!),
+                          destKey: _handCardKey(_swapPlayerA!, _swapIndexA!),
+                          arcHeight: -28,
+                          onCompleted: _onSwapFlightBCompleted,
+                        ),
+                      ),
                   ],
                 ),
         );
@@ -938,7 +1104,7 @@ class PlayerView extends StatelessWidget {
     this.onChallenge,
     this.onEndTurn,
     this.cardKeyFor,
-    this.hollowIndex,
+    this.hollowIndexes = const {},
     this.hollowIsExtra = false,
     this.hollowCollapsing = false,
   });
@@ -954,7 +1120,7 @@ class PlayerView extends StatelessWidget {
   final VoidCallback? onChallenge;
   final VoidCallback? onEndTurn;
   final GlobalKey Function(int handIndex)? cardKeyFor;
-  final int? hollowIndex;
+  final Set<int> hollowIndexes;
   final bool hollowIsExtra;
   final bool hollowCollapsing;
 
@@ -1004,7 +1170,7 @@ class PlayerView extends StatelessWidget {
               onCardTap: onCardTap,
               onCardDoubleTap: onCardDoubleTap,
               cardKeyFor: cardKeyFor,
-              hollowIndex: hollowIndex,
+              hollowIndexes: hollowIndexes,
               hollowIsExtra: hollowIsExtra,
               hollowCollapsing: hollowCollapsing,
             ),
