@@ -12,6 +12,9 @@ enum CardFlightFace {
   /// Stay face-down for the whole flight.
   hidden,
 
+  /// Stay face-up for the whole flight.
+  visible,
+
   /// Travel face-down, then flip face-up at the destination.
   reveal,
 
@@ -131,6 +134,8 @@ class _DrawCardFlightState extends State<DrawCardFlight> with SingleTickerProvid
     switch (widget.face) {
       case CardFlightFace.hidden:
         return BackCard(cardModel: widget.card, tight: true);
+      case CardFlightFace.visible:
+        return FrontCard(cardModel: widget.card, tight: true);
       case CardFlightFace.reveal:
         return showFrontAfterFlip
             ? Transform.flip(flipX: true, child: FrontCard(cardModel: widget.card, tight: true))

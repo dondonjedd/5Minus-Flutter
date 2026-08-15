@@ -23,6 +23,8 @@ import 'widgets/draw_card_flight.dart';
 import 'widgets/game_overlay.dart';
 import 'widgets/player_hands_widget.dart';
 
+enum _EliminatePhase { hover, commit, returning, rearranging, penalty, collapsing }
+
 class ActiveGameScreen extends StatefulWidget {
   final ActiveGameController controller;
   final ActiveGameParams activeGameParams;
@@ -55,6 +57,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   String? _statusMessage;
 
   final GlobalKey _discardPileKey = GlobalKey();
+  final GlobalKey _eliminateHoverKey = GlobalKey();
   final GlobalKey _deckKey = GlobalKey();
   final GlobalKey _drawnSlotKey = GlobalKey();
   Offset _drawnCardDragAnchor = Offset.zero;
@@ -68,9 +71,22 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   CardModel? _eliminateFlightCard;
   int? _eliminatePlayerIndex;
   int? _eliminateHandIndex;
+  _EliminatePhase _eliminatePhase = _EliminatePhase.hover;
+  bool _eliminateFailed = false;
+  bool _eliminateMatchOver = false;
+  bool _eliminateHoverReady = false;
+  bool _eliminateResultReady = false;
+  bool _eliminateFollowUpStarted = false;
   bool _eliminateCardRemoved = false;
   bool _eliminateCollapsing = false;
+  bool _eliminateAllowResult = false;
+  DateTime? _eliminateHoverArrivedAt;
+  Timer? _eliminateHoldTimer;
   Timer? _eliminateCollapseTimer;
+  String? _eliminateNotice;
+  String? _lastEliminateToken;
+  CardModel? _eliminatePenaltyCard;
+  int? _eliminatePenaltyIndex;
   final Map<String, GlobalKey> _handCardKeys = {};
   List<List<CardModel>> _lastHands = [];
   CardModel? _lastDrawnCard;
@@ -108,6 +124,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     _heartbeat?.cancel();
     _reconnectCheck?.cancel();
     _eliminateCollapseTimer?.cancel();
+    _eliminateHoldTimer?.cancel();
     _replaceDrawnHoldTimer?.cancel();
     super.dispose();
   }
@@ -290,26 +307,19 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     final card = cubit.state?.players[me].playerHand?[handIndex];
     if (card == null) return;
 
-    setState(() {
-      _eliminateFlightCard = card;
-      _eliminatePlayerIndex = me;
-      _eliminateHandIndex = handIndex;
-      _eliminateCardRemoved = false;
-      _eliminateCollapsing = false;
-    });
+    _beginEliminateHover(card: card, playerIndex: me, handIndex: handIndex);
 
     final err = await cubit.eliminateCard(handIndex);
     if (!mounted) return;
-    if (err != null) {
-      _clearEliminateFlight(statusMessage: err);
-      return;
-    }
-    if (_eliminateFlightCard != null) {
-      setState(() {
-        _eliminateCardRemoved = true;
-        _statusMessage = null;
-      });
-    }
+    final ev = cubit.state?.lastEliminate;
+    final penalty = ev != null && ev.failed ? _penaltyFrom(cubit.state, me) : (card: null, index: null);
+    _applyEliminateResult(
+      failed: ev?.failed ?? err != null,
+      matchOver: ev?.matchOver ?? cubit.isMatchOver,
+      notice: err,
+      penaltyCard: penalty.card,
+      penaltyIndex: penalty.index,
+    );
   }
 
   Future<void> _onOpponentCardTap(MatchCubit cubit, int handIndex) async {
@@ -420,23 +430,135 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     return 0;
   }
 
-  void _maybeStartEliminateFlight(GameModel state) {
-    if (_eliminatePlayerIndex != null || _replacePlayerIndex != null) return;
-    final previousHands = _lastHands;
-    if (previousHands.length != state.players.length) return;
-    for (var i = 0; i < state.players.length; i++) {
-      final previous = previousHands[i];
-      final next = state.players[i].playerHand ?? const <CardModel>[];
-      final index = _removedHandIndex(previous, next);
-      if (index == null) continue;
-      setState(() {
-        _eliminateFlightCard = previous[index];
-        _eliminatePlayerIndex = i;
-        _eliminateHandIndex = index;
-        _eliminateCardRemoved = true;
-      });
+  static const _wrongRankNotice = 'Wrong rank - elimination locked until your next turn';
+
+  bool get _showEliminateHoverFlight {
+    if (_eliminateFlightCard == null || _eliminatePlayerIndex == null || _eliminateHandIndex == null) {
+      return false;
+    }
+    if (_eliminatePhase == _EliminatePhase.hover) return true;
+    if (_eliminateFollowUpStarted) return false;
+    return _eliminatePhase == _EliminatePhase.commit || _eliminatePhase == _EliminatePhase.returning;
+  }
+
+  ({CardModel? card, int? index}) _penaltyFrom(GameModel? state, int playerIndex) {
+    if (state == null || playerIndex < 0 || playerIndex >= state.players.length) {
+      return (card: null, index: null);
+    }
+    final hand = state.players[playerIndex].playerHand ?? const <CardModel>[];
+    if (hand.isEmpty) return (card: null, index: null);
+    return (card: hand.last, index: hand.length - 1);
+  }
+
+  void _beginEliminateHover({
+    required CardModel card,
+    required int playerIndex,
+    required int handIndex,
+  }) {
+    _eliminateHoldTimer?.cancel();
+    _eliminateHoldTimer = null;
+    setState(() {
+      _eliminateFlightCard = card;
+      _eliminatePlayerIndex = playerIndex;
+      _eliminateHandIndex = handIndex;
+      _eliminatePhase = _EliminatePhase.hover;
+      _eliminateFailed = false;
+      _eliminateMatchOver = false;
+      _eliminateHoverReady = false;
+      _eliminateResultReady = false;
+      _eliminateFollowUpStarted = false;
+      _eliminateCardRemoved = false;
+      _eliminateCollapsing = false;
+      _eliminateAllowResult = false;
+      _eliminateHoverArrivedAt = null;
+      _eliminateNotice = null;
+      _eliminatePenaltyCard = null;
+      _eliminatePenaltyIndex = null;
+    });
+  }
+
+  void _applyEliminateResult({
+    required bool failed,
+    required bool matchOver,
+    String? notice,
+    CardModel? penaltyCard,
+    int? penaltyIndex,
+  }) {
+    if (!mounted) return;
+    if (_eliminateResultReady && _eliminateFailed == failed && _eliminateMatchOver == matchOver) {
       return;
     }
+    setState(() {
+      _eliminateFailed = failed;
+      _eliminateMatchOver = matchOver;
+      _eliminateResultReady = true;
+      _eliminateNotice = notice;
+      if (failed) {
+        _eliminatePenaltyIndex = penaltyIndex;
+        _eliminatePenaltyCard = penaltyCard;
+      } else {
+        _eliminateCardRemoved = true;
+      }
+    });
+    _maybeBranchEliminate();
+  }
+
+  void _maybeStartEliminateFlight(GameModel state) {
+    if (_replacePlayerIndex != null) return;
+    final ev = state.lastEliminate;
+    if (ev == null) {
+      _lastEliminateToken = null;
+      if (_eliminatePlayerIndex != null) return;
+      final previousHands = _lastHands;
+      if (previousHands.length != state.players.length) return;
+      for (var i = 0; i < state.players.length; i++) {
+        final previous = previousHands[i];
+        final next = state.players[i].playerHand ?? const <CardModel>[];
+        final index = _removedHandIndex(previous, next);
+        if (index == null) continue;
+        _beginEliminateHover(card: previous[index], playerIndex: i, handIndex: index);
+        _applyEliminateResult(failed: false, matchOver: state.status == 'finished');
+        return;
+      }
+      return;
+    }
+
+    final token = '${ev.seat}:${ev.handIndex}:${ev.failed}:${ev.matchOver}';
+    if (token == _lastEliminateToken) return;
+    _lastEliminateToken = token;
+
+    final playerIndex = state.players.indexWhere((p) => p.seat == ev.seat);
+    if (playerIndex < 0) return;
+    final penalty = ev.failed ? _penaltyFrom(state, playerIndex) : (card: null, index: null);
+
+    if (_eliminatePlayerIndex != null) {
+      _applyEliminateResult(
+        failed: ev.failed,
+        matchOver: ev.matchOver,
+        notice: ev.failed ? (_eliminateNotice ?? _wrongRankNotice) : null,
+        penaltyCard: penalty.card,
+        penaltyIndex: penalty.index,
+      );
+      return;
+    }
+
+    CardModel? card;
+    if (ev.failed) {
+      final hand = state.players[playerIndex].playerHand ?? const <CardModel>[];
+      if (ev.handIndex >= 0 && ev.handIndex < hand.length) card = hand[ev.handIndex];
+    } else if (playerIndex < _lastHands.length && ev.handIndex >= 0 && ev.handIndex < _lastHands[playerIndex].length) {
+      card = _lastHands[playerIndex][ev.handIndex];
+    }
+    if (card == null) return;
+
+    _beginEliminateHover(card: card, playerIndex: playerIndex, handIndex: ev.handIndex);
+    _applyEliminateResult(
+      failed: ev.failed,
+      matchOver: ev.matchOver,
+      notice: ev.failed ? _wrongRankNotice : null,
+      penaltyCard: penalty.card,
+      penaltyIndex: penalty.index,
+    );
   }
 
   int? _addedHandIndex(List<CardModel> previous, List<CardModel> next) {
@@ -458,6 +580,8 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   }
 
   void _maybeStartSabotageFlight(GameModel state) {
+    if (state.lastEliminate?.failed == true) return;
+    if (_eliminatePlayerIndex != null && _eliminateFailed) return;
     if (_sabotagePlayerIndex != null) return;
     final pile = state.discardDeck?.cardDeck;
     if (pile == null || pile.isEmpty || pile.last.cardPower != CardPower.sabotage) return;
@@ -704,10 +828,31 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     });
   }
 
+  Set<int> _omittedIndexesFor(int playerIndex) {
+    if (_eliminatePlayerIndex != playerIndex || !_eliminateFailed) return const {};
+    if (_eliminatePhase == _EliminatePhase.collapsing) return const {};
+    final index = _eliminatePenaltyIndex;
+    if (index == null) return const {};
+    return {index};
+  }
+
+  bool _eliminateHollowIsExtra(int playerIndex) {
+    if (_eliminatePlayerIndex != playerIndex) return false;
+    if (_eliminateCardRemoved) return true;
+    return _eliminateFailed &&
+        _eliminatePenaltyIndex != null &&
+        (_eliminatePhase == _EliminatePhase.rearranging || _eliminatePhase == _EliminatePhase.penalty);
+  }
+
   Set<int> _hollowIndexesFor(int playerIndex) {
     final indexes = <int>{};
-    if (_eliminatePlayerIndex == playerIndex && _eliminateHandIndex != null) {
-      indexes.add(_eliminateHandIndex!);
+    if (_eliminatePlayerIndex == playerIndex) {
+      if ((_eliminatePhase == _EliminatePhase.rearranging || _eliminatePhase == _EliminatePhase.penalty) &&
+          _eliminatePenaltyIndex != null) {
+        indexes.add(_eliminatePenaltyIndex!);
+      } else if (_eliminateHandIndex != null) {
+        indexes.add(_eliminateHandIndex!);
+      }
     }
     if (_sabotagePlayerIndex == playerIndex && _sabotageFlightCard != null && _sabotageHandIndex != null) {
       indexes.add(_sabotageHandIndex!);
@@ -784,14 +929,50 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     });
   }
 
-  void _onEliminateFlightCompleted() {
+  void _onEliminateHoverCompleted() {
+    if (!mounted || _eliminateHoverReady) return;
+    _eliminateHoverReady = true;
+    _eliminateHoverArrivedAt = DateTime.now();
+    _maybeBranchEliminate();
+  }
+
+  void _maybeBranchEliminate() {
+    if (!mounted || !_eliminateHoverReady || !_eliminateResultReady) return;
+    if (_eliminatePhase != _EliminatePhase.hover) return;
+    if (_eliminateHoldTimer != null) return;
+    final arrived = _eliminateHoverArrivedAt ?? DateTime.now();
+    final remaining = const Duration(seconds: 1) - DateTime.now().difference(arrived);
+    _eliminateHoldTimer = Timer(remaining.isNegative ? Duration.zero : remaining, _branchEliminate);
+  }
+
+  void _branchEliminate() {
     if (!mounted) return;
-    if (!_eliminateCardRemoved || _eliminateHandIndex == null) {
-      _clearEliminateFlight();
+    _eliminateHoldTimer = null;
+    if (_eliminateFailed && _eliminateMatchOver) {
+      setState(() => _eliminateAllowResult = true);
+      _maybeShowResult(context.read<MatchCubit>());
       return;
     }
+    if (_eliminateFailed) {
+      setState(() {
+        _eliminatePhase = _EliminatePhase.returning;
+        _statusMessage = _eliminateNotice ?? _wrongRankNotice;
+      });
+      return;
+    }
+    setState(() => _eliminatePhase = _EliminatePhase.commit);
+  }
+
+  void _onEliminateFollowUpStarted() {
+    if (!mounted || _eliminateFollowUpStarted) return;
+    setState(() => _eliminateFollowUpStarted = true);
+  }
+
+  void _onEliminateCommitCompleted() {
+    if (!mounted) return;
     setState(() {
       _eliminateFlightCard = null;
+      _eliminatePhase = _EliminatePhase.collapsing;
       _eliminateCollapsing = true;
     });
     _eliminateCollapseTimer?.cancel();
@@ -801,20 +982,62 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     });
   }
 
+  void _onEliminateReturnCompleted() {
+    if (!mounted) return;
+    if (_eliminatePenaltyCard == null || _eliminatePenaltyIndex == null) {
+      _clearEliminateFlight();
+      return;
+    }
+    setState(() {
+      _eliminatePhase = _EliminatePhase.rearranging;
+      _eliminateFollowUpStarted = false;
+      _eliminateCollapsing = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _eliminatePhase != _EliminatePhase.rearranging) return;
+      setState(() => _eliminateCollapsing = false);
+      _eliminateCollapseTimer?.cancel();
+      _eliminateCollapseTimer = Timer(PlayerHands.collapseDuration, () {
+        if (!mounted || _eliminatePhase != _EliminatePhase.rearranging) return;
+        setState(() => _eliminatePhase = _EliminatePhase.penalty);
+      });
+    });
+  }
+
+  void _onEliminatePenaltyCompleted() {
+    if (!mounted) return;
+    _clearEliminateFlight();
+  }
+
   void _clearEliminateFlight({String? statusMessage}) {
     _eliminateCollapseTimer?.cancel();
     _eliminateCollapseTimer = null;
+    _eliminateHoldTimer?.cancel();
+    _eliminateHoldTimer = null;
     setState(() {
       _eliminateFlightCard = null;
       _eliminatePlayerIndex = null;
       _eliminateHandIndex = null;
+      _eliminatePhase = _EliminatePhase.hover;
+      _eliminateFailed = false;
+      _eliminateMatchOver = false;
+      _eliminateHoverReady = false;
+      _eliminateResultReady = false;
+      _eliminateFollowUpStarted = false;
       _eliminateCardRemoved = false;
       _eliminateCollapsing = false;
+      _eliminateAllowResult = false;
+      _eliminateHoverArrivedAt = null;
+      _eliminateNotice = null;
+      _eliminatePenaltyCard = null;
+      _eliminatePenaltyIndex = null;
       if (statusMessage != null) _statusMessage = statusMessage;
     });
+    if (mounted) _maybeShowResult(context.read<MatchCubit>());
   }
 
   void _maybeShowResult(MatchCubit cubit) {
+    if (_eliminatePlayerIndex != null && !_eliminateAllowResult) return;
     if (!cubit.isMatchOver || _resultShown || !mounted) return;
     _resultShown = true;
     final isDraw = cubit.isDraw;
@@ -915,8 +1138,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                       onEndTurn: null,
                                       cardKeyFor: (i) => _handCardKey(oppIndex, i),
                                       hollowIndexes: _hollowIndexesFor(oppIndex),
-                                      hollowIsExtra: _eliminatePlayerIndex == oppIndex && _eliminateCardRemoved,
+                                      hollowIsExtra: _eliminateHollowIsExtra(oppIndex),
                                       hollowCollapsing: _eliminatePlayerIndex == oppIndex && _eliminateCollapsing,
+                                      omittedIndexes: _omittedIndexesFor(oppIndex),
                                     ),
                                   ),
                           ),
@@ -951,12 +1175,24 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     ),
                                     Expanded(
                                       flex: 2,
-                                      child: DiscardPile(
-                                        key: _discardPileKey,
-                                        highlighted: _drawnCardOverPile,
-                                        pendingTopCard: _pendingDiscardCard,
-                                        lockTop: _replaceOutgoingCard != null,
-                                        lockedTopCard: _replaceFrozenPileTop,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: DiscardPile(
+                                              key: _discardPileKey,
+                                              highlighted: _drawnCardOverPile,
+                                              pendingTopCard: _pendingDiscardCard,
+                                              lockTop: _replaceOutgoingCard != null,
+                                              lockedTopCard: _replaceFrozenPileTop,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            key: _eliminateHoverKey,
+                                            width: 40,
+                                            height: 60,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -989,8 +1225,9 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
                                     cardKeyFor: (i) => _handCardKey(userIndex!, i),
                                     hollowIndexes: _hollowIndexesFor(userIndex!),
-                                    hollowIsExtra: _eliminatePlayerIndex == userIndex && _eliminateCardRemoved,
+                                    hollowIsExtra: _eliminateHollowIsExtra(userIndex!),
                                     hollowCollapsing: _eliminatePlayerIndex == userIndex && _eliminateCollapsing,
+                                    omittedIndexes: _omittedIndexesFor(userIndex!),
                                   ),
                           ),
                         ],
@@ -1008,16 +1245,60 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                           onCompleted: _onDrawFlightCompleted,
                         ),
                       ),
-                    if (_eliminateFlightCard != null && _eliminatePlayerIndex != null && _eliminateHandIndex != null)
+                    if (_showEliminateHoverFlight)
                       Positioned.fill(
-                        key: const ValueKey('eliminate-flight'),
+                        key: const ValueKey('eliminate-hover'),
                         child: DrawCardFlight(
                           card: _eliminateFlightCard!,
                           face: CardFlightFace.reveal,
                           sourceKey: _handCardKey(_eliminatePlayerIndex!, _eliminateHandIndex!),
+                          destKey: _eliminateHoverKey,
+                          onCompleted: _onEliminateHoverCompleted,
+                        ),
+                      ),
+                    if (_eliminateFlightCard != null &&
+                        _eliminatePhase == _EliminatePhase.commit &&
+                        _eliminatePlayerIndex != null &&
+                        _eliminateHandIndex != null)
+                      Positioned.fill(
+                        key: const ValueKey('eliminate-commit'),
+                        child: DrawCardFlight(
+                          card: _eliminateFlightCard!,
+                          face: CardFlightFace.visible,
+                          sourceKey: _eliminateHoverKey,
                           destKey: _discardPileKey,
-                          holdAfter: const Duration(milliseconds: 1000),
-                          onCompleted: _onEliminateFlightCompleted,
+                          onStarted: _onEliminateFollowUpStarted,
+                          onCompleted: _onEliminateCommitCompleted,
+                        ),
+                      ),
+                    if (_eliminateFlightCard != null &&
+                        _eliminatePhase == _EliminatePhase.returning &&
+                        _eliminatePlayerIndex != null &&
+                        _eliminateHandIndex != null)
+                      Positioned.fill(
+                        key: const ValueKey('eliminate-return'),
+                        child: DrawCardFlight(
+                          card: _eliminateFlightCard!,
+                          face: CardFlightFace.conceal,
+                          sourceKey: _eliminateHoverKey,
+                          destKey: _handCardKey(_eliminatePlayerIndex!, _eliminateHandIndex!),
+                          flipAtEnd: true,
+                          onStarted: _onEliminateFollowUpStarted,
+                          onCompleted: _onEliminateReturnCompleted,
+                        ),
+                      ),
+                    if (_eliminatePhase == _EliminatePhase.penalty &&
+                        _eliminatePenaltyCard != null &&
+                        _eliminatePlayerIndex != null &&
+                        _eliminatePenaltyIndex != null)
+                      Positioned.fill(
+                        key: const ValueKey('eliminate-penalty'),
+                        child: DrawCardFlight(
+                          card: _eliminatePenaltyCard!,
+                          face: CardFlightFace.hidden,
+                          sourceKey: _deckKey,
+                          destKey: _handCardKey(_eliminatePlayerIndex!, _eliminatePenaltyIndex!),
+                          onCompleted: _onEliminatePenaltyCompleted,
                         ),
                       ),
                     if (_replaceIncomingCard != null && _replacePlayerIndex != null && _replaceHandIndex != null)
@@ -1107,6 +1388,7 @@ class PlayerView extends StatelessWidget {
     this.hollowIndexes = const {},
     this.hollowIsExtra = false,
     this.hollowCollapsing = false,
+    this.omittedIndexes = const {},
   });
 
   final int? userIndex;
@@ -1123,6 +1405,7 @@ class PlayerView extends StatelessWidget {
   final Set<int> hollowIndexes;
   final bool hollowIsExtra;
   final bool hollowCollapsing;
+  final Set<int> omittedIndexes;
 
   @override
   Widget build(BuildContext context) {
@@ -1173,6 +1456,7 @@ class PlayerView extends StatelessWidget {
               hollowIndexes: hollowIndexes,
               hollowIsExtra: hollowIsExtra,
               hollowCollapsing: hollowCollapsing,
+              omittedIndexes: omittedIndexes,
             ),
           ),
         ),

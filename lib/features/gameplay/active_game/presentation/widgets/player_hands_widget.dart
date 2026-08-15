@@ -30,6 +30,7 @@ class PlayerHands extends StatelessWidget {
     this.hollowIndexes = const {},
     this.hollowIsExtra = false,
     this.hollowCollapsing = false,
+    this.omittedIndexes = const {},
   });
 
   final int playerIndex;
@@ -43,6 +44,7 @@ class PlayerHands extends StatelessWidget {
   final Set<int> hollowIndexes;
   final bool hollowIsExtra;
   final bool hollowCollapsing;
+  final Set<int> omittedIndexes;
 
   static const Duration collapseDuration = Duration(milliseconds: 800);
 
@@ -53,16 +55,26 @@ class PlayerHands extends StatelessWidget {
         final hand = state?.players[playerIndex].playerHand ?? [];
         final extra = hollowIsExtra && hollowIndexes.isNotEmpty;
         final extraIndex = extra ? hollowIndexes.first : null;
+        final visibleIndexes = [
+          for (var i = 0; i < hand.length; i++)
+            if (!omittedIndexes.contains(i)) i,
+        ];
+        final appendExtra = extra && omittedIndexes.isNotEmpty;
+        final extraVisualIndex = appendExtra ? visibleIndexes.length : extraIndex;
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           scrollDirection: Axis.horizontal,
-          itemCount: hand.length + (extra ? 1 : 0),
+          itemCount: visibleIndexes.length + (extra ? 1 : 0),
           itemBuilder: (context, visualIndex) {
-            if (extra && visualIndex == extraIndex) {
-              return _hollowSlot(visualIndex);
+            if (extra && extraVisualIndex != null && visualIndex == extraVisualIndex) {
+              return _hollowSlot(appendExtra ? extraIndex! : visualIndex);
             }
-            final handIndex = extra && visualIndex > extraIndex! ? visualIndex - 1 : visualIndex;
+            final handIndex = appendExtra
+                ? visibleIndexes[visualIndex]
+                : extra
+                    ? (visualIndex > extraIndex! ? visualIndex - 1 : visualIndex)
+                    : visibleIndexes[visualIndex];
             final hide = !extra && hollowIndexes.contains(handIndex);
             final showFront = revealedIndexes.contains(handIndex);
             final selected = jackSelected?.contains('$playerIndex:$handIndex') ?? false;

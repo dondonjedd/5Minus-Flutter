@@ -7,6 +7,36 @@ import 'card_model.dart';
 
 const Object _unset = Object();
 
+class LastEliminate {
+  final int seat;
+  final int handIndex;
+  final bool failed;
+  final bool matchOver;
+
+  const LastEliminate({
+    required this.seat,
+    required this.handIndex,
+    required this.failed,
+    required this.matchOver,
+  });
+
+  factory LastEliminate.fromMap(Map<String, dynamic> data) {
+    return LastEliminate(
+      seat: (data['seat'] as num?)?.toInt() ?? 0,
+      handIndex: (data['hand_index'] as num?)?.toInt() ?? 0,
+      failed: data['failed'] as bool? ?? false,
+      matchOver: data['match_over'] as bool? ?? false,
+    );
+  }
+
+  static LastEliminate? tryParse(dynamic value) {
+    if (value is Map) {
+      return LastEliminate.fromMap(Map<String, dynamic>.from(value));
+    }
+    return null;
+  }
+}
+
 class GameModel {
   final String hostId;
   final String code;
@@ -20,6 +50,7 @@ class GameModel {
   final DateTime? powerStartTime;
   final PlayerMatchModel? winner;
   final String? endReason;
+  final LastEliminate? lastEliminate;
 
   const GameModel({
     required this.hostId,
@@ -34,6 +65,7 @@ class GameModel {
     this.powerStartTime,
     this.winner,
     this.endReason,
+    this.lastEliminate,
   });
 
   bool get isActive => status == 'active';
@@ -79,6 +111,7 @@ class GameModel {
       powerStartTime: _parseDateTime(data['power_start_time']),
       winner: winner,
       endReason: data['end_reason'] as String?,
+      lastEliminate: LastEliminate.tryParse(data['last_eliminate']),
     );
   }
 
@@ -105,6 +138,7 @@ class GameModel {
     Object? powerStartTime = _unset,
     Object? winner = _unset,
     Object? endReason = _unset,
+    Object? lastEliminate = _unset,
   }) {
     return GameModel(
       hostId: hostId,
@@ -119,6 +153,7 @@ class GameModel {
       powerStartTime: identical(powerStartTime, _unset) ? this.powerStartTime : powerStartTime as DateTime?,
       winner: identical(winner, _unset) ? this.winner : winner as PlayerMatchModel?,
       endReason: identical(endReason, _unset) ? this.endReason : endReason as String?,
+      lastEliminate: identical(lastEliminate, _unset) ? this.lastEliminate : lastEliminate as LastEliminate?,
     );
   }
 }
