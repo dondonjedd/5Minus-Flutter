@@ -65,6 +65,9 @@ begin
     raise exception 'draw deck %', n_draw;
   end if;
 
+  update public.match_players set peek_ready = true where game_code = 'TSTA';
+  update public.matches set turn_start_time = now() where game_code = 'TSTA';
+
   -- third Seat after active: trigger max-seats (and RLS would also block)
   begin
     insert into public.match_players (game_code, user_id, seat)

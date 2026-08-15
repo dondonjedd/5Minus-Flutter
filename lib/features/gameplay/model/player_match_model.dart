@@ -16,6 +16,7 @@ class PlayerMatchModel extends Equatable {
   final int penaltyCount;
   final bool eliminationLocked;
   final bool actionsComplete;
+  final bool peekReady;
   final String? lastSeen;
 
   const PlayerMatchModel({
@@ -28,6 +29,7 @@ class PlayerMatchModel extends Equatable {
     this.penaltyCount = 0,
     this.eliminationLocked = false,
     this.actionsComplete = false,
+    this.peekReady = false,
     this.lastSeen,
   });
 
@@ -50,6 +52,7 @@ class PlayerMatchModel extends Equatable {
       penaltyCount: (data['penalty_count'] as int?) ?? 0,
       eliminationLocked: (data['elimination_locked'] as bool?) ?? false,
       actionsComplete: (data['actions_complete'] as bool?) ?? false,
+      peekReady: (data['peek_ready'] as bool?) ?? (data['peekReady'] as bool?) ?? false,
       lastSeen: _lastSeenFrom(data['last_seen']),
     );
   }
@@ -67,6 +70,7 @@ class PlayerMatchModel extends Equatable {
       penaltyCount: (data['penalty_count'] as int?) ?? 0,
       eliminationLocked: (data['elimination_locked'] as bool?) ?? false,
       actionsComplete: (data['actions_complete'] as bool?) ?? false,
+      peekReady: (data['peek_ready'] as bool?) ?? false,
       lastSeen: _lastSeenFrom(data['last_seen']),
     );
   }
@@ -80,6 +84,7 @@ class PlayerMatchModel extends Equatable {
         'penalty_count': penaltyCount,
         'elimination_locked': eliminationLocked,
         'actions_complete': actionsComplete,
+        'peek_ready': peekReady,
         'last_seen': lastSeen,
       };
 
@@ -93,6 +98,7 @@ class PlayerMatchModel extends Equatable {
         'penalty_count': penaltyCount,
         'elimination_locked': eliminationLocked,
         'actions_complete': actionsComplete,
+        'peek_ready': peekReady,
       };
 
   /// Column patch for an existing Seat. Never includes `last_seen`.
@@ -126,6 +132,7 @@ class PlayerMatchModel extends Equatable {
     Object? penaltyCount = _unset,
     Object? eliminationLocked = _unset,
     Object? actionsComplete = _unset,
+    Object? peekReady = _unset,
     Object? lastSeen = _unset,
   }) {
     return PlayerMatchModel(
@@ -140,6 +147,7 @@ class PlayerMatchModel extends Equatable {
       eliminationLocked:
           identical(eliminationLocked, _unset) ? this.eliminationLocked : eliminationLocked as bool,
       actionsComplete: identical(actionsComplete, _unset) ? this.actionsComplete : actionsComplete as bool,
+      peekReady: identical(peekReady, _unset) ? this.peekReady : peekReady as bool,
       lastSeen: identical(lastSeen, _unset) ? this.lastSeen : lastSeen as String?,
     );
   }
@@ -154,6 +162,7 @@ class PlayerMatchModel extends Equatable {
         penaltyCount,
         eliminationLocked,
         actionsComplete,
+        peekReady,
         lastSeen,
       ];
 }

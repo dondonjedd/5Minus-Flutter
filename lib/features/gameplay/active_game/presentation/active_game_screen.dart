@@ -43,9 +43,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   Timer? _reconnectCheck;
   bool _resultShown = false;
 
-  /// Local-only opening peek of leftmost cards.
-  Set<int> _peekedIndexes = {};
-  bool _peekDone = false;
+  Timer? _peekTimer;
 
   /// Local queen reveal: playerIndex → handIndex.
   int? _queenRevealPlayer;
@@ -123,6 +121,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     _gameSubscription?.cancel();
     _heartbeat?.cancel();
     _reconnectCheck?.cancel();
+    _peekTimer?.cancel();
     _eliminateCollapseTimer?.cancel();
     _eliminateHoldTimer?.cancel();
     _replaceDrawnHoldTimer?.cancel();
@@ -142,7 +141,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
       _gameSubscription = widget.controller.listenToChanges(context);
       userIndex = matchCubit.getUserIndex();
 
-      _startOpeningPeek();
+      _syncPeekTimer(matchCubit.state);
       _heartbeat = Timer.periodic(const Duration(seconds: 10), (_) {
         matchCubit.heartbeat();
       });
@@ -158,20 +157,50 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     super.initState();
   }
 
-  void _startOpeningPeek() {
-    if (_peekDone || userIndex == null) return;
-    setState(() {
-      _peekedIndexes = {
-        for (var i = 0; i < GameConstants.openingPeekCount; i++) i,
-      };
-    });
-    Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted) return;
-      setState(() {
-        _peekedIndexes = {};
-        _peekDone = true;
-      });
-    });
+  void _syncPeekTimer(GameModel? state) {
+    if (state == null || !state.isPeekOpen) {
+      _peekTimer?.cancel();
+      _peekTimer = null;
+      return;
+    }
+    if (_peekTimer != null) return;
+    _peekTimer = Timer.periodic(const Duration(seconds: 1), (_) => _onPeekTick());
+    _onPeekTick();
+  }
+
+  void _onPeekTick() {
+    if (!mounted) return;
+    final cubit = context.read<MatchCubit>();
+    final game = cubit.state;
+    if (game == null || !game.isPeekOpen) {
+      _peekTimer?.cancel();
+      _peekTimer = null;
+      setState(() {});
+      return;
+    }
+    if (game.peekSecondsRemaining() <= 0) {
+      _peekTimer?.cancel();
+      _peekTimer = null;
+      unawaited(cubit.readyPeek());
+    }
+    setState(() {});
+  }
+
+  Set<int> _openingPeekIndexes(MatchCubit cubit) {
+    final game = cubit.state;
+    if (game == null || !game.isPeekOpen || userIndex == null) return {};
+    if (userIndex! < 0 || userIndex! >= game.players.length) return {};
+    if (game.players[userIndex!].peekReady) return {};
+    return {for (var i = 0; i < GameConstants.openingPeekCount; i++) i};
+  }
+
+  Widget _peekReadyControl(MatchCubit cubit, GameModel state) {
+    final seconds = state.peekSecondsRemaining();
+    final meReady = userIndex != null && userIndex! < state.players.length && state.players[userIndex!].peekReady;
+    return ElevatedButton(
+      onPressed: meReady ? null : () => cubit.readyPeek(),
+      child: Text(meReady ? 'Waiting… $seconds' : 'Ready $seconds'),
+    );
   }
 
   Offset _drawnCardAnchorStrategy(Draggable<Object> _, BuildContext context, Offset position) {
@@ -847,8 +876,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
   Set<int> _hollowIndexesFor(int playerIndex) {
     final indexes = <int>{};
     if (_eliminatePlayerIndex == playerIndex) {
-      if ((_eliminatePhase == _EliminatePhase.rearranging || _eliminatePhase == _EliminatePhase.penalty) &&
-          _eliminatePenaltyIndex != null) {
+      if ((_eliminatePhase == _EliminatePhase.rearranging || _eliminatePhase == _EliminatePhase.penalty) && _eliminatePenaltyIndex != null) {
         indexes.add(_eliminatePenaltyIndex!);
       } else if (_eliminateHandIndex != null) {
         indexes.add(_eliminateHandIndex!);
@@ -1072,6 +1100,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
     return BlocConsumer<MatchCubit, GameModel?>(
       listener: (context, state) {
         final matchCubit = context.read<MatchCubit>();
+        _syncPeekTimer(state);
         _maybeShowResult(matchCubit);
         _maybeStartDrawFlight(matchCubit, state);
       },
@@ -1133,7 +1162,7 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                         if (_queenRevealPlayer == oppIndex && _queenRevealIndex != null) _queenRevealIndex!,
                                       },
                                       jackSelected: _jackPicks,
-                                      onCardTap: (i) => _onOpponentCardTap(matchCubit, i),
+                                      onCardTap: matchCubit.isPeekOpen ? null : (i) => _onOpponentCardTap(matchCubit, i),
                                       onChallenge: null,
                                       onEndTurn: null,
                                       cardKeyFor: (i) => _handCardKey(oppIndex, i),
@@ -1210,19 +1239,20 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                                     isOpponent: false,
                                     mode: mode,
                                     revealedIndexes: {
-                                      ..._peekedIndexes,
+                                      ..._openingPeekIndexes(matchCubit),
                                       if (_queenRevealPlayer == userIndex && _queenRevealIndex != null) _queenRevealIndex!,
                                     },
                                     jackSelected: _jackPicks,
-                                    onCardTap: (i) => _onOwnCardTap(matchCubit, i),
-                                    onCardDoubleTap: matchCubit.canEliminate() &&
+                                    onCardTap: matchCubit.isPeekOpen ? null : (i) => _onOwnCardTap(matchCubit, i),
+                                    onCardDoubleTap: !matchCubit.isPeekOpen &&
+                                            matchCubit.canEliminate() &&
                                             _eliminatePlayerIndex == null &&
                                             _replacePlayerIndex == null &&
                                             _swapPlayerA == null
                                         ? (i) => _onOwnCardDoubleTap(matchCubit, i)
                                         : null,
-                                    onChallenge: matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
-                                    onEndTurn: matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
+                                    onChallenge: !matchCubit.isPeekOpen && matchCubit.canChallenge() ? () => matchCubit.declareChallenge() : null,
+                                    onEndTurn: !matchCubit.isPeekOpen && matchCubit.canEndTurn() ? () => matchCubit.endTurn() : null,
                                     cardKeyFor: (i) => _handCardKey(userIndex!, i),
                                     hollowIndexes: _hollowIndexesFor(userIndex!),
                                     hollowIsExtra: _eliminateHollowIsExtra(userIndex!),
@@ -1234,6 +1264,13 @@ class _ActiveGameScreenState extends State<ActiveGameScreen> {
                       ),
                     ),
                     const Positioned.fill(child: GameOverlay()),
+                    if (state != null && state.isPeekOpen)
+                      Positioned(
+                        right: MediaQuery.sizeOf(context).width * 0.08,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(child: _peekReadyControl(matchCubit, state)),
+                      ),
                     if (_drawFlightCard != null)
                       Positioned.fill(
                         key: const ValueKey('draw-flight'),

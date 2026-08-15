@@ -43,6 +43,9 @@ class MatchRemoteDatasource {
   Future<Map<String, dynamic>> startMatch(String gameCode) =>
       SupabaseService.rpcMatchPlay('start_match', {'p_code': gameCode});
 
+  Future<Map<String, dynamic>> readyPeek(String gameCode) =>
+      SupabaseService.rpcMatchPlay('ready_peek', {'p_code': gameCode});
+
   Future<Map<String, dynamic>> claimDraw(String gameCode) =>
       SupabaseService.rpcMatchPlay('claim_draw', {'p_code': gameCode});
 

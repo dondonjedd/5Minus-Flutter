@@ -80,6 +80,10 @@ class MatchRepository {
     return assembleBundle(await _datasource.startMatch(gameCode));
   }
 
+  Future<GameModel> readyPeek(String gameCode) async {
+    return assembleBundle(await _datasource.readyPeek(gameCode));
+  }
+
   Future<GameModel> claimDraw(String gameCode) async {
     return assembleBundle(await _datasource.claimDraw(gameCode));
   }

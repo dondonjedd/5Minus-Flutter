@@ -37,6 +37,8 @@ begin
 
   perform private._test_set_uid('elim-a');
   bundle := public.start_match('ELIM');
+  update public.match_players set peek_ready = true where game_code = 'ELIM';
+  update public.matches set turn_start_time = now() where game_code = 'ELIM';
 
   -- Known piles: discard top rank 5, seat 0 hand four cards, index 1 is rank 7.
   update public.matches
@@ -157,12 +159,13 @@ begin
   end if;
 
   -- Third penalty ends the match (match_over true).
-  insert into public.matches (game_code, host_id, status, turn, discard_deck, draw_deck)
+  insert into public.matches (game_code, host_id, status, turn, turn_start_time, discard_deck, draw_deck)
   values (
     'ELI2',
     'elim-a',
     'active',
     0,
+    now(),
     jsonb_build_array(private.make_card(1, 1)),
     jsonb_build_array(private.make_card(2, 1), private.make_card(3, 1), private.make_card(4, 1))
   );
@@ -207,12 +210,13 @@ begin
   end if;
 
   -- Challenge / shrink still prepends (apply_penalty with null insert-after).
-  insert into public.matches (game_code, host_id, status, turn, discard_deck, draw_deck)
+  insert into public.matches (game_code, host_id, status, turn, turn_start_time, discard_deck, draw_deck)
   values (
     'ELI3',
     'elim-a',
     'active',
     0,
+    now(),
     jsonb_build_array(private.make_card(5, 1)),
     jsonb_build_array(private.make_card(2, 2))
   );

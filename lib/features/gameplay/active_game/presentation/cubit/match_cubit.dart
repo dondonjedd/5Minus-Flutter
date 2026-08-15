@@ -26,6 +26,7 @@ class MatchCubit extends Cubit<GameModel?> {
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   bool _autoDrawInFlight = false;
+  bool _readyPeekInFlight = false;
 
   bool get hasPendingPower {
     if (state?.powerStartTime == null) return false;
@@ -48,6 +49,10 @@ class MatchCubit extends Cubit<GameModel?> {
   bool get isMatchOver => state?.winner != null || state?.status == 'finished';
 
   bool get isDraw => state?.endReason == EndReason.challengeTie;
+
+  bool get isPlayUnlocked => state?.isPlayUnlocked ?? false;
+
+  bool get isPeekOpen => state?.isPeekOpen ?? false;
 
   Future<void> initalize(String? gameCode) async {
     if (gameCode == null) return;
@@ -73,6 +78,20 @@ class MatchCubit extends Cubit<GameModel?> {
 
   Future<void> setGameToActive() async {}
 
+  Future<void> readyPeek() async {
+    if (_readyPeekInFlight) return;
+    final game = state;
+    if (game == null || !game.isPeekOpen) return;
+    _readyPeekInFlight = true;
+    try {
+      await _emitMove(await _matchRepository.readyPeek(game.code));
+    } on ServerException {
+      return;
+    } finally {
+      _readyPeekInFlight = false;
+    }
+  }
+
   bool isMyTurn() {
     final me = _me();
     if (me == null || state?.turn == null) return false;
@@ -80,7 +99,7 @@ class MatchCubit extends Cubit<GameModel?> {
   }
 
   bool canDraw() {
-    if (isMatchOver || !isMyTurn() || hasPendingPower) return false;
+    if (isMatchOver || !isPlayUnlocked || !isMyTurn() || hasPendingPower) return false;
     final me = _me();
     if (me == null || (me.actionsComplete)) return false;
     return state?.drawnCard == null;
@@ -88,7 +107,7 @@ class MatchCubit extends Cubit<GameModel?> {
 
   bool get needsAutoDraw {
     final game = state;
-    if (game == null || isMatchOver || !game.isActive || hasPendingPower) return false;
+    if (game == null || isMatchOver || !game.isPlayUnlocked || hasPendingPower) return false;
     final turn = game.turn;
     final active = _playerAtSeat(game, turn);
     if (active == null) return false;
@@ -111,14 +130,14 @@ class MatchCubit extends Cubit<GameModel?> {
   }
 
   bool canDiscardOrReplace() {
-    if (isMatchOver || !isMyTurn() || hasPendingPower) return false;
+    if (isMatchOver || !isPlayUnlocked || !isMyTurn() || hasPendingPower) return false;
     final me = _me();
     if (me == null || me.actionsComplete) return false;
     return state?.drawnCard != null;
   }
 
   bool canEliminate() {
-    if (isMatchOver || !isMyTurn() || hasPendingPower) return false;
+    if (isMatchOver || !isPlayUnlocked || !isMyTurn() || hasPendingPower) return false;
     final me = _me();
     if (me == null) return false;
     if (me.eliminationLocked) return false;
@@ -126,14 +145,14 @@ class MatchCubit extends Cubit<GameModel?> {
   }
 
   bool canChallenge() {
-    if (isMatchOver || !isMyTurn() || hasPendingPower) return false;
+    if (isMatchOver || !isPlayUnlocked || !isMyTurn() || hasPendingPower) return false;
     final me = _me();
     if (me == null) return false;
     return me.actionsComplete && !(me.isChallengedDeclard ?? false);
   }
 
   bool canEndTurn() {
-    if (isMatchOver || !isMyTurn() || hasPendingPower) return false;
+    if (isMatchOver || !isPlayUnlocked || !isMyTurn() || hasPendingPower) return false;
     final me = _me();
     return me?.actionsComplete == true;
   }

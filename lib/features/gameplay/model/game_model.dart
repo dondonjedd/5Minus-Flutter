@@ -47,6 +47,7 @@ class GameModel {
   final int? turn;
   final CardModel? drawnCard;
   final DateTime? turnStartTime;
+  final DateTime? peekDeadline;
   final DateTime? powerStartTime;
   final PlayerMatchModel? winner;
   final String? endReason;
@@ -62,6 +63,7 @@ class GameModel {
     this.turn,
     this.drawnCard,
     this.turnStartTime,
+    this.peekDeadline,
     this.powerStartTime,
     this.winner,
     this.endReason,
@@ -70,6 +72,15 @@ class GameModel {
 
   bool get isActive => status == 'active';
   bool get hasStarted => status != 'lobby';
+  bool get isPlayUnlocked => turnStartTime != null;
+  bool get isPeekOpen => isActive && !isPlayUnlocked;
+
+  int peekSecondsRemaining({DateTime? now}) {
+    final deadline = peekDeadline;
+    if (deadline == null) return 0;
+    final left = deadline.difference((now ?? DateTime.now()).toUtc()).inSeconds;
+    return left < 0 ? 0 : left;
+  }
 
   /// Timestamps are always normalised to UTC so that values read back from
   /// Postgres (`timestamptz`) compare equal to the ones written locally.
@@ -108,6 +119,7 @@ class GameModel {
           ? null
           : CardModel.fromMap(Map<String, dynamic>.from(data['drawn_card'] as Map)),
       turnStartTime: _parseDateTime(data['turn_start_time']),
+      peekDeadline: _parseDateTime(data['peek_deadline']),
       powerStartTime: _parseDateTime(data['power_start_time']),
       winner: winner,
       endReason: data['end_reason'] as String?,
@@ -135,6 +147,7 @@ class GameModel {
     int? turn,
     Object? drawnCard = _unset,
     Object? turnStartTime = _unset,
+    Object? peekDeadline = _unset,
     Object? powerStartTime = _unset,
     Object? winner = _unset,
     Object? endReason = _unset,
@@ -150,6 +163,7 @@ class GameModel {
       turn: turn ?? this.turn,
       drawnCard: identical(drawnCard, _unset) ? this.drawnCard : drawnCard as CardModel?,
       turnStartTime: identical(turnStartTime, _unset) ? this.turnStartTime : turnStartTime as DateTime?,
+      peekDeadline: identical(peekDeadline, _unset) ? this.peekDeadline : peekDeadline as DateTime?,
       powerStartTime: identical(powerStartTime, _unset) ? this.powerStartTime : powerStartTime as DateTime?,
       winner: identical(winner, _unset) ? this.winner : winner as PlayerMatchModel?,
       endReason: identical(endReason, _unset) ? this.endReason : endReason as String?,
