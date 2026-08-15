@@ -25,7 +25,7 @@ class BackCard extends StatelessWidget {
     final model = cardModel;
     if (_revealHidden && model != null && model.rank != null && model.suit != null) {
       return ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+        imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
         child: FrontCard(cardModel: model, tight: tight),
       );
     }
